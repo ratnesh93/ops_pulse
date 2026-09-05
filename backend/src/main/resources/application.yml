@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: opspulse
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/opspulse}
+    username: ${SPRING_DATASOURCE_USERNAME:opspulse}
+    password: ${SPRING_DATASOURCE_PASSWORD:opspulse}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 500
+        order_inserts: true
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+server:
+  port: 8080
+
+opspulse:
+  data-path: ${DATA_PATH:/data/moveinsync}
+  trip-file: ${TRIP_FILE:Ride_data _trip-July_2026.csv}
+  prior-trip-file: ${PRIOR_TRIP_FILE:Ride_data _trip-June_2026.csv}
+  bill-file: ${BILL_FILE:bill_data.csv}
+  analysis-vendor: ${ANALYSIS_VENDOR:Rohan Mikhailov Travel}
+  peer-vendor: ${PEER_VENDOR:Priya Mikhailov Travel}
+  sla-ota-pct: ${SLA_OTA_PCT:90}
+  skip-data-load: ${SKIP_DATA_LOAD:false}
+  vendor-display-alias: "Rohan Travel (Vendor B)"
+  sarvam:
+    api-key: ${SARVAM_API_KEY:}
+    base-url: ${SARVAM_BASE_URL:https://api.sarvam.ai}
+    stt-model: ${SARVAM_STT_MODEL:saaras:v3}
+    language-code: ${SARVAM_LANGUAGE_CODE:en-IN}
+
+logging:
+  level:
+    com.moveinsync.opspulse: INFO

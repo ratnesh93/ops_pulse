@@ -113,18 +113,21 @@ body {
 
 .toggle-group {
   display: flex;
+  flex-wrap: wrap;
   background: #1a2332;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
+  max-width: 100%;
 }
 
 .toggle-group button {
   border: none;
   background: transparent;
   color: #94a3b8;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.85rem;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  white-space: nowrap;
 }
 
 .toggle-group button.active {

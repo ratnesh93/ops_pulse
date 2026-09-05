@@ -166,17 +166,20 @@ public class AgentOrchestrator {
         finding.setCreatedAt(Instant.now());
 
         if (benchmark != null) {
-            finding.setMetricJson(toJson(Map.of(
-                    "vendorId", benchmark.getVendorId(),
-                    "otaPct", benchmark.getOtaPct(),
-                    "tripCount", benchmark.getTripCount(),
-                    "totalCost", benchmark.getTotalCost())));
-            finding.setBenchmarkJson(toJson(Map.of(
-                    "slaOtaPct", benchmark.getSlaOtaPct(),
-                    "priorMonthOtaPct", benchmark.getPriorMonthOtaPct(),
-                    "peerOtaPct", benchmark.getPeerOtaPct(),
-                    "peerVendorName", benchmark.getPeerVendorName(),
-                    "delayAttribution", benchmark.getDelayAttribution())));
+            Map<String, Object> metric = new HashMap<>();
+            metric.put("vendorId", benchmark.getVendorId());
+            metric.put("otaPct", benchmark.getOtaPct());
+            metric.put("tripCount", benchmark.getTripCount());
+            metric.put("totalCost", benchmark.getTotalCost());
+            finding.setMetricJson(toJson(metric));
+
+            Map<String, Object> benchmarkData = new HashMap<>();
+            benchmarkData.put("slaOtaPct", benchmark.getSlaOtaPct());
+            benchmarkData.put("priorMonthOtaPct", benchmark.getPriorMonthOtaPct());
+            benchmarkData.put("peerOtaPct", benchmark.getPeerOtaPct());
+            benchmarkData.put("peerVendorName", benchmark.getPeerVendorName());
+            benchmarkData.put("delayAttribution", benchmark.getDelayAttribution());
+            finding.setBenchmarkJson(toJson(benchmarkData));
             finding.setNarration(narrationClient.narrateVendorBreach(benchmark));
         } else if (safety != null) {
             finding.setMetricJson(toJson(Map.of(

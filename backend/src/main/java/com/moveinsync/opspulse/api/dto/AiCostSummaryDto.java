@@ -12,6 +12,7 @@ public class AiCostSummaryDto {
     private long totalRequests;
     private String currency = "INR";
     private List<OperationBreakdown> byOperation;
+    private List<ProviderBreakdown> byProvider;
     private List<UsageEntry> recentUsage;
 
     public BigDecimal getTotalCostInr() {
@@ -62,12 +63,68 @@ public class AiCostSummaryDto {
         this.byOperation = byOperation;
     }
 
+    public List<ProviderBreakdown> getByProvider() {
+        return byProvider;
+    }
+
+    public void setByProvider(List<ProviderBreakdown> byProvider) {
+        this.byProvider = byProvider;
+    }
+
     public List<UsageEntry> getRecentUsage() {
         return recentUsage;
     }
 
     public void setRecentUsage(List<UsageEntry> recentUsage) {
         this.recentUsage = recentUsage;
+    }
+
+    public static class ProviderBreakdown {
+        private String provider;
+        private long requestCount;
+        private long inputTokens;
+        private long outputTokens;
+        private BigDecimal costInr;
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String provider) {
+            this.provider = provider;
+        }
+
+        public long getRequestCount() {
+            return requestCount;
+        }
+
+        public void setRequestCount(long requestCount) {
+            this.requestCount = requestCount;
+        }
+
+        public long getInputTokens() {
+            return inputTokens;
+        }
+
+        public void setInputTokens(long inputTokens) {
+            this.inputTokens = inputTokens;
+        }
+
+        public long getOutputTokens() {
+            return outputTokens;
+        }
+
+        public void setOutputTokens(long outputTokens) {
+            this.outputTokens = outputTokens;
+        }
+
+        public BigDecimal getCostInr() {
+            return costInr;
+        }
+
+        public void setCostInr(BigDecimal costInr) {
+            this.costInr = costInr;
+        }
     }
 
     public static class OperationBreakdown {

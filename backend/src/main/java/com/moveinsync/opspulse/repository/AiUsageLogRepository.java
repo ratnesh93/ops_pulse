@@ -31,4 +31,16 @@ public interface AiUsageLogRepository extends JpaRepository<AiUsageLog, Long> {
             ORDER BY a.operationType
             """)
     List<Object[]> aggregateByOperationType();
+
+    @Query("""
+            SELECT a.provider,
+                   COUNT(a),
+                   COALESCE(SUM(a.inputTokens), 0),
+                   COALESCE(SUM(a.outputTokens), 0),
+                   COALESCE(SUM(a.cost), 0)
+            FROM AiUsageLog a
+            GROUP BY a.provider
+            ORDER BY a.provider
+            """)
+    List<Object[]> aggregateByProvider();
 }

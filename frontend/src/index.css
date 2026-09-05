@@ -294,6 +294,72 @@ button.confirm:disabled {
   padding: 1.25rem;
 }
 
+.ai-cost-panel--full {
+  border-color: #4c1d95;
+}
+
+.ai-cost-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #c4b5fd;
+  background: #2e1065;
+  border: 1px solid #5b21b6;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+}
+
+.ai-cost-routing {
+  margin-bottom: 1.25rem;
+}
+
+.ai-cost-routing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.ai-cost-routing-card {
+  background: #0f1419;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.ai-cost-routing-layer {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin-bottom: 0.25rem;
+}
+
+.ai-cost-routing-provider {
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-bottom: 0.35rem;
+}
+
+.ai-cost-routing-card p {
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.ai-cost-routing-cost {
+  font-size: 0.75rem;
+  color: #a78bfa;
+}
+
+.ai-cost-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
 .ai-cost-panel {
   background: #1a2332;
   border: 1px solid #334155;

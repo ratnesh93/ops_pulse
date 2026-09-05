@@ -29,7 +29,7 @@ function formatTime(iso) {
 }
 
 export default function App() {
-  const [view, setView] = useState('transport');
+  const [view, setView] = useState('monitoring');
   const [brief, setBrief] = useState(null);
   const [log, setLog] = useState([]);
   const [memo, setMemo] = useState('');
@@ -55,13 +55,20 @@ export default function App() {
   }, []);
 
   const loadFacilitiesData = useCallback(async () => {
-    setAiCostsLoading(true);
     try {
-      const [memoData, costData] = await Promise.all([fetchMemo(), fetchAiCosts()]);
+      const memoData = await fetchMemo();
       setMemo(memoData.memo || '');
-      setAiCosts(costData);
     } catch {
       setMemo('Leadership memo not yet generated. Run the agent first.');
+    }
+  }, []);
+
+  const loadAiCosts = useCallback(async () => {
+    setAiCostsLoading(true);
+    try {
+      const costData = await fetchAiCosts();
+      setAiCosts(costData);
+    } catch {
       setAiCosts(null);
     } finally {
       setAiCostsLoading(false);
@@ -78,7 +85,12 @@ export default function App() {
     if (view === 'facilities') {
       loadFacilitiesData();
     }
-  }, [view, loadFacilitiesData]);
+    if (view === 'ai-costs') {
+      loadAiCosts();
+      const interval = setInterval(loadAiCosts, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [view, loadFacilitiesData, loadAiCosts]);
 
   async function handleConfirm(actionId) {
     setConfirming(actionId);
@@ -98,6 +110,7 @@ export default function App() {
       await runAgent();
       await refresh();
       if (view === 'facilities') await loadFacilitiesData();
+      if (view === 'ai-costs') await loadAiCosts();
     } catch (e) {
       setError(e.message);
     } finally {
@@ -130,6 +143,12 @@ export default function App() {
         <div className="controls">
           <div className="toggle-group">
             <button
+              className={view === 'monitoring' ? 'active' : ''}
+              onClick={() => setView('monitoring')}
+            >
+              Monitoring
+            </button>
+            <button
               className={view === 'transport' ? 'active' : ''}
               onClick={() => setView('transport')}
             >
@@ -142,12 +161,6 @@ export default function App() {
               Facilities Head
             </button>
             <button
-              className={view === 'monitoring' ? 'active' : ''}
-              onClick={() => setView('monitoring')}
-            >
-              Monitoring
-            </button>
-            <button
               className={view === 'vendors' ? 'active' : ''}
               onClick={() => setView('vendors')}
             >
@@ -158,6 +171,12 @@ export default function App() {
               onClick={() => setView('chat')}
             >
               Chat
+            </button>
+            <button
+              className={view === 'ai-costs' ? 'active' : ''}
+              onClick={() => setView('ai-costs')}
+            >
+              AI Costs
             </button>
           </div>
           <button className="primary" onClick={handleRunAgent} disabled={running}>
@@ -195,7 +214,9 @@ export default function App() {
         </div>
       </section>
 
-      {view === 'transport' ? (
+      {view === 'monitoring' ? (
+        <MonitoringPanel />
+      ) : view === 'transport' ? (
         <section className="panels">
           <div className="panel">
             <h2>Findings</h2>
@@ -241,8 +262,7 @@ export default function App() {
         </section>
       ) : view === 'facilities' ? (
         <section className="facilities-panel">
-          <AiCostPanel aiCosts={aiCosts} loading={aiCostsLoading} />
-          <div className="memo-panel" style={{ marginTop: '1.5rem' }}>
+          <div className="memo-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>Leadership Memo</h2>
               <button className="primary" onClick={copyMemo}>Copy</button>
@@ -250,8 +270,8 @@ export default function App() {
             <div className="memo-text">{memo}</div>
           </div>
         </section>
-      ) : view === 'monitoring' ? (
-        <MonitoringPanel />
+      ) : view === 'ai-costs' ? (
+        <AiCostPanel aiCosts={aiCosts} loading={aiCostsLoading} fullPage />
       ) : view === 'vendors' ? (
         <VendorPanel />
       ) : view === 'chat' ? (

@@ -113,6 +113,20 @@ public class AiCostService {
                 })
                 .toList();
         summary.setByOperation(breakdown);
+
+        List<AiCostSummaryDto.ProviderBreakdown> byProvider = repository.aggregateByProvider().stream()
+                .map(row -> {
+                    AiCostSummaryDto.ProviderBreakdown item = new AiCostSummaryDto.ProviderBreakdown();
+                    item.setProvider((String) row[0]);
+                    item.setRequestCount(((Number) row[1]).longValue());
+                    item.setInputTokens(((Number) row[2]).longValue());
+                    item.setOutputTokens(((Number) row[3]).longValue());
+                    item.setCostInr((BigDecimal) row[4]);
+                    return item;
+                })
+                .toList();
+        summary.setByProvider(byProvider);
+
         summary.setTotalRequests(breakdown.stream().mapToLong(AiCostSummaryDto.OperationBreakdown::getRequestCount).sum());
 
         summary.setRecentUsage(repository.findTop20ByOrderByCreatedAtDesc().stream()

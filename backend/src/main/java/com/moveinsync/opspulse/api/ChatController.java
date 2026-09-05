@@ -56,7 +56,7 @@ public class ChatController {
         String transcript = sarvamSpeechClient.transcribe(
                 audio.getBytes(),
                 audio.getOriginalFilename(),
-                audio.getContentType());
+                audio.getContentType()).getTranscript();
 
         String reply = chatService.reply(transcript);
         return new ChatResponse(reply, transcript);

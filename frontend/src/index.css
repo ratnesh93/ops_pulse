@@ -294,6 +294,374 @@ button.confirm:disabled {
   padding: 1.25rem;
 }
 
+.ai-cost-panel {
+  background: #1a2332;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.ai-cost-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.ai-cost-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.ai-cost-subtitle {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.ai-cost-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.ai-cost-kpi {
+  background: #0f1419;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ai-cost-kpi-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.ai-cost-kpi-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ai-cost-breakdown h3,
+.ai-cost-recent h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  color: #cbd5e1;
+}
+
+.ai-cost-recent {
+  margin-top: 1.25rem;
+}
+
+.ai-cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.ai-cost-table th,
+.ai-cost-table td {
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid #2d3748;
+}
+
+.ai-cost-table th {
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ai-cost-table td:last-child,
+.ai-cost-table th:last-child {
+  text-align: right;
+}
+
+.monitoring-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.monitoring-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.monitoring-header h2 {
+  margin: 0 0 0.25rem;
+}
+
+.monitoring-subtitle {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.monitoring-pending-badge {
+  background: #7c3aed33;
+  color: #c4b5fd;
+  border: 1px solid #7c3aed66;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.monitoring-simulate {
+  background: #1a2332;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.simulate-label {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.simulate-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.simulate-btn {
+  border: 1px solid #334155;
+  background: #0f1419;
+  color: #e7ecf3;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.simulate-btn:hover:not(:disabled) {
+  border-color: #64748b;
+}
+
+.simulate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.simulate-negative {
+  border-color: #f8717155;
+  color: #fca5a5;
+}
+
+.simulate-positive {
+  border-color: #34d39955;
+  color: #6ee7b7;
+}
+
+.simulate-neutral {
+  border-color: #94a3b855;
+  color: #cbd5e1;
+}
+
+.monitoring-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .monitoring-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.monitoring-feed h3,
+.monitoring-actions h3 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.feed-item {
+  background: #0f1419;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  border-left: 3px solid #64748b;
+}
+
+.feed-item.sentiment-negative {
+  border-left-color: #f87171;
+}
+
+.feed-item.sentiment-positive {
+  border-left-color: #34d399;
+}
+
+.feed-item.sentiment-neutral {
+  border-left-color: #94a3b8;
+}
+
+.feed-item p {
+  margin: 0.35rem 0;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+}
+
+.feed-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.sentiment-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.sentiment-tag.sentiment-negative {
+  background: #7f1d1d55;
+  color: #fca5a5;
+}
+
+.sentiment-tag.sentiment-positive {
+  background: #064e3b55;
+  color: #6ee7b7;
+}
+
+.sentiment-tag.sentiment-neutral {
+  background: #33415555;
+  color: #cbd5e1;
+}
+
+.feed-time {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.feed-meta {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.live-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.live-action-card {
+  background: #0f1419;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.live-action-card.severity-high {
+  border-color: #f8717166;
+}
+
+.live-action-card.severity-medium {
+  border-color: #fbbf2466;
+}
+
+.live-action-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.action-type-tag {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  background: #1e293b;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.ai-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #a78bfa;
+  background: #581c8755;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.ai-insight {
+  color: #cbd5e1;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0.5rem 0;
+}
+
+.recommended-action {
+  background: #1e293b;
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  margin-bottom: 0.75rem;
+}
+
+.rec-label {
+  color: #5eead4;
+  font-weight: 600;
+  margin-right: 0.35rem;
+}
+
+.dismiss-btn {
+  background: transparent;
+  border: 1px solid #475569;
+  color: #94a3b8;
+  border-radius: 6px;
+  padding: 0.4rem 0.85rem;
+  cursor: pointer;
+}
+
+.dismiss-btn:hover:not(:disabled) {
+  border-color: #64748b;
+  color: #e2e8f0;
+}
+
+.action-count {
+  color: #a78bfa;
+  font-weight: normal;
+  font-size: 0.9rem;
+}
+
 .memo-text {
   white-space: pre-wrap;
   line-height: 1.6;

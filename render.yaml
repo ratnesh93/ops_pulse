@@ -1,117 +1,63 @@
-services:
-
-  # =========================
-  # Backend - Spring Boot
-  # =========================
-  - type: web
-    name: opspulse-api
-    runtime: docker
-    plan: free
-
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-
-    healthCheckPath: /api/health
-
-    envVars:
-      - key: PORT
-        value: "8080"
-
-      - key: JAVA_TOOL_OPTIONS
-        value: "-Xmx384m -Xms128m"
-
-      - key: DB_HOST
-        fromDatabase:
-          name: opspulse-db
-          property: host
-
-      - key: DB_PORT
-        fromDatabase:
-          name: opspulse-db
-          property: port
-
-      - key: DB_NAME
-        fromDatabase:
-          name: opspulse-db
-          property: database
-
-      - key: SPRING_DATASOURCE_USERNAME
-        fromDatabase:
-          name: opspulse-db
-          property: user
-
-      - key: SPRING_DATASOURCE_PASSWORD
-        fromDatabase:
-          name: opspulse-db
-          property: password
-
-      - key: SPRING_DATASOURCE_URL
-        value: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
-
-      - key: DATA_PATH
-        value: /data/moveinsync
-
-      - key: TRIP_FILE
-        value: "Ride_data _trip-July_2026.csv"
-
-      - key: PRIOR_TRIP_FILE
-        value: "Ride_data _trip-June_2026.csv"
-
-      - key: BILL_FILE
-        value: bill_data.csv
-
-      - key: ANALYSIS_VENDOR
-        value: "Rohan Mikhailov Travel"
-
-      - key: PEER_VENDOR
-        value: "Priya Mikhailov Travel"
-
-      - key: SLA_OTA_PCT
-        value: "90"
-
-      - key: SKIP_DATA_LOAD
-        value: "true"
-
-      - key: SARVAM_API_KEY
-        sync: false
-
-      - key: OPENAI_API_KEY
-        sync: false
-
-
-  # =========================
-  # Frontend - React
-  # =========================
-  - type: web
-    name: opspulse-web
-    runtime: static
-    plan: free
-
-    rootDir: frontend
-
-    buildCommand: npm install && npm run build
-
-    staticPublishPath: ./dist
-
-    envVars:
-      - key: VITE_API_BASE_URL
-        fromService:
-          name: opspulse-api
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
-
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-
-
-# =========================
-# PostgreSQL
-# =========================
 databases:
-
   - name: opspulse-db
     plan: free
     databaseName: opspulse
     user: opspulse
+
+services:
+  - type: web
+    name: opspulse-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: opspulse-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: opspulse-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: opspulse-db
+          property: database
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: opspulse-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: opspulse-db
+          property: password
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+      - key: DATA_PATH
+        value: /data/moveinsync
+      - key: SKIP_DATA_LOAD
+        value: "true"
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+  - type: web
+    name: opspulse-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    envVars:
+      # Render free: frontend reaches backend via public onrender.com URL (nginx proxy).
+      - key: BACKEND_SCHEME
+        value: https
+      - key: BACKEND_HOST
+        fromService:
+          name: opspulse-api
+          type: web
+          property: host
+      - key: BACKEND_DOMAIN_SUFFIX
+        value: .onrender.com

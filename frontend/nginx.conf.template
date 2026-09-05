@@ -1,0 +1,28 @@
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=10s;
+    proxy_ssl_server_name on;
+
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Same-origin /api — nginx proxies to backend (Compose or Render public URL).
+    # BACKEND_SCHEME + BACKEND_HOST + BACKEND_DOMAIN_SUFFIX → upstream origin.
+    # Render free tier: use https + public onrender.com host (see render.yaml).
+    location /api/ {
+        set $backend_upstream ${BACKEND_HOST}${BACKEND_DOMAIN_SUFFIX};
+        proxy_pass ${BACKEND_SCHEME}://$backend_upstream$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host $backend_upstream;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}

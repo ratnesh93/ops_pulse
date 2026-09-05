@@ -1,6 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL
-  ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/api`
-  : '/api';
+const API_BASE = '/api';
 
 export async function fetchBrief() {
   const res = await fetch(`${API_BASE}/brief`);
@@ -17,6 +15,36 @@ export async function fetchActivityLog() {
 export async function fetchMemo() {
   const res = await fetch(`${API_BASE}/leadership/memo`);
   if (!res.ok) throw new Error('Failed to load memo');
+  return res.json();
+}
+
+export async function fetchAiCosts() {
+  const res = await fetch(`${API_BASE}/ai/costs`);
+  if (!res.ok) throw new Error('Failed to load AI costs');
+  return res.json();
+}
+
+export async function fetchMonitoring() {
+  const res = await fetch(`${API_BASE}/monitoring`);
+  if (!res.ok) throw new Error('Failed to load monitoring');
+  return res.json();
+}
+
+export async function simulateMonitoringFeed(scenario) {
+  const res = await fetch(`${API_BASE}/monitoring/simulate/${scenario}`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to simulate live feed');
+  return res.json();
+}
+
+export async function confirmMonitoringAction(id) {
+  const res = await fetch(`${API_BASE}/monitoring/actions/${id}/confirm`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to confirm action');
+  return res.json();
+}
+
+export async function dismissMonitoringAction(id) {
+  const res = await fetch(`${API_BASE}/monitoring/actions/${id}/dismiss`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to dismiss action');
   return res.json();
 }
 

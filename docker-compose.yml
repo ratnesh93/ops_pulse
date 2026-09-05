@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: opspulse
       POSTGRES_USER: opspulse
-      POSTGRES_PASSWORD: opspulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opspulse_dev_password}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -18,33 +18,31 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    ports:
-      - "8090:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opspulse
       SPRING_DATASOURCE_USERNAME: opspulse
-      SPRING_DATASOURCE_PASSWORD: opspulse
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-opspulse_dev_password}
       DATA_PATH: /data/moveinsync
       TRIP_FILE: "Ride_data _trip-July_2026.csv"
       PRIOR_TRIP_FILE: "Ride_data _trip-June_2026.csv"
       BILL_FILE: bill_data.csv
-      ANALYSIS_VENDOR: "Rohan Mikhailov Travel"
-      PEER_VENDOR: "Priya Mikhailov Travel"
-      SLA_OTA_PCT: "90"
       SKIP_DATA_LOAD: "false"
-      SARVAM_API_KEY: "${SARVAM_API_KEY:-}"
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
       - ../data/MoveInSync - Anonymised Trip-Log Dataset-20260905T010918Z-1-001/MoveInSync - Anonymised Trip-Log Dataset:/data/moveinsync:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
+    ports:
+      - "8090:8080"
 
   frontend:
     build: ./frontend
-    ports:
-      - "4210:80"
     depends_on:
       - backend
+    ports:
+      - "4210:80"
 
 volumes:
   pgdata:

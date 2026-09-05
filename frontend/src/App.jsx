@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import ChatPanel from './ChatPanel';
 import MorningBriefBanner from './MorningBriefBanner';
 import VendorPanel from './VendorPanel';
+import AiCostPanel from './AiCostPanel';
+import MonitoringPanel from './MonitoringPanel';
 import {
   confirmAction,
   fetchActivityLog,
+  fetchAiCosts,
   fetchBrief,
   fetchMemo,
   runAgent,
@@ -30,6 +33,8 @@ export default function App() {
   const [brief, setBrief] = useState(null);
   const [log, setLog] = useState([]);
   const [memo, setMemo] = useState('');
+  const [aiCosts, setAiCosts] = useState(null);
+  const [aiCostsLoading, setAiCostsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [confirming, setConfirming] = useState(null);
@@ -49,12 +54,17 @@ export default function App() {
     }
   }, []);
 
-  const loadMemo = useCallback(async () => {
+  const loadFacilitiesData = useCallback(async () => {
+    setAiCostsLoading(true);
     try {
-      const data = await fetchMemo();
-      setMemo(data.memo || '');
+      const [memoData, costData] = await Promise.all([fetchMemo(), fetchAiCosts()]);
+      setMemo(memoData.memo || '');
+      setAiCosts(costData);
     } catch {
       setMemo('Leadership memo not yet generated. Run the agent first.');
+      setAiCosts(null);
+    } finally {
+      setAiCostsLoading(false);
     }
   }, []);
 
@@ -66,9 +76,9 @@ export default function App() {
 
   useEffect(() => {
     if (view === 'facilities') {
-      loadMemo();
+      loadFacilitiesData();
     }
-  }, [view, loadMemo]);
+  }, [view, loadFacilitiesData]);
 
   async function handleConfirm(actionId) {
     setConfirming(actionId);
@@ -87,7 +97,7 @@ export default function App() {
     try {
       await runAgent();
       await refresh();
-      if (view === 'facilities') await loadMemo();
+      if (view === 'facilities') await loadFacilitiesData();
     } catch (e) {
       setError(e.message);
     } finally {
@@ -130,6 +140,12 @@ export default function App() {
               onClick={() => setView('facilities')}
             >
               Facilities Head
+            </button>
+            <button
+              className={view === 'monitoring' ? 'active' : ''}
+              onClick={() => setView('monitoring')}
+            >
+              Monitoring
             </button>
             <button
               className={view === 'vendors' ? 'active' : ''}
@@ -224,13 +240,18 @@ export default function App() {
           </div>
         </section>
       ) : view === 'facilities' ? (
-        <section className="memo-panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ margin: 0 }}>Leadership Memo</h2>
-            <button className="primary" onClick={copyMemo}>Copy</button>
+        <section className="facilities-panel">
+          <AiCostPanel aiCosts={aiCosts} loading={aiCostsLoading} />
+          <div className="memo-panel" style={{ marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ margin: 0 }}>Leadership Memo</h2>
+              <button className="primary" onClick={copyMemo}>Copy</button>
+            </div>
+            <div className="memo-text">{memo}</div>
           </div>
-          <div className="memo-text">{memo}</div>
         </section>
+      ) : view === 'monitoring' ? (
+        <MonitoringPanel />
       ) : view === 'vendors' ? (
         <VendorPanel />
       ) : view === 'chat' ? (

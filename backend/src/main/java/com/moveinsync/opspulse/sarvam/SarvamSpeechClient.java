@@ -2,6 +2,7 @@ package com.moveinsync.opspulse.sarvam;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.moveinsync.opspulse.ai.AiCostService;
 import com.moveinsync.opspulse.config.SarvamProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,16 +20,21 @@ public class SarvamSpeechClient {
     private static final Logger log = LoggerFactory.getLogger(SarvamSpeechClient.class);
 
     private final SarvamProperties properties;
+    private final AiCostService aiCostService;
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
 
-    public SarvamSpeechClient(SarvamProperties properties, ObjectMapper objectMapper) {
+    public SarvamSpeechClient(
+            SarvamProperties properties,
+            AiCostService aiCostService,
+            ObjectMapper objectMapper) {
         this.properties = properties;
+        this.aiCostService = aiCostService;
         this.objectMapper = objectMapper;
         this.restClient = RestClient.builder().build();
     }
 
-    public String transcribe(byte[] audioBytes, String filename, String contentType) {
+    public TranscriptionResult transcribe(byte[] audioBytes, String filename, String contentType) {
         if (!properties.isConfigured()) {
             throw new IllegalStateException(
                     "Sarvam API key not configured. Set SARVAM_API_KEY in docker-compose.yml or .env");
@@ -59,7 +65,15 @@ public class SarvamSpeechClient {
             if (transcript == null || transcript.isNull() || transcript.asText().isBlank()) {
                 throw new IllegalStateException("Sarvam returned empty transcript");
             }
-            return transcript.asText().trim();
+
+            String text = transcript.asText().trim();
+            Integer durationMs = parseDurationMs(root);
+            int inputTokens = aiCostService.estimateAudioInputTokens(audioBytes.length, durationMs);
+            int outputTokens = aiCostService.estimateTextTokens(text);
+
+            aiCostService.logSttUsage(properties.getSttModel(), audioBytes.length, text, durationMs);
+
+            return new TranscriptionResult(text, inputTokens, outputTokens, durationMs);
         } catch (RestClientException e) {
             log.error("Sarvam STT request failed", e);
             throw new IllegalStateException("Speech-to-text failed: " + e.getMessage(), e);
@@ -67,5 +81,15 @@ public class SarvamSpeechClient {
             log.error("Failed to parse Sarvam response", e);
             throw new IllegalStateException("Speech-to-text failed: " + e.getMessage(), e);
         }
+    }
+
+    private Integer parseDurationMs(JsonNode root) {
+        if (root.has("duration_ms") && !root.get("duration_ms").isNull()) {
+            return root.get("duration_ms").asInt();
+        }
+        if (root.has("audio_duration") && !root.get("audio_duration").isNull()) {
+            return (int) (root.get("audio_duration").asDouble() * 1000);
+        }
+        return null;
     }
 }

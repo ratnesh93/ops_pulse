@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import ActionInsightCard from './ActionInsightCard';
 import ChatPanel from './ChatPanel';
 import MorningBriefBanner from './MorningBriefBanner';
 import VendorPanel from './VendorPanel';
@@ -6,6 +7,7 @@ import AiCostPanel from './AiCostPanel';
 import MonitoringPanel from './MonitoringPanel';
 import {
   confirmAction,
+  dismissAction,
   fetchActivityLog,
   fetchAiCosts,
   fetchBrief,
@@ -28,6 +30,13 @@ function formatAiCost(value) {
   if (num >= 1) return `₹${num.toFixed(2)}`;
   if (num >= 0.01) return `₹${num.toFixed(4)}`;
   return `₹${num.toFixed(6)}`;
+}
+
+function aiProviderPct(costInr, totalInr) {
+  const cost = Number(costInr ?? 0);
+  const total = Number(totalInr ?? 0);
+  if (!total) return '0%';
+  return `${((cost / total) * 100).toFixed(1)}%`;
 }
 
 function formatTime(iso) {
@@ -117,6 +126,18 @@ export default function App() {
     }
   }
 
+  async function handleDismiss(actionId) {
+    setConfirming(actionId);
+    try {
+      await dismissAction(actionId);
+      await refresh();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setConfirming(null);
+    }
+  }
+
   async function handleRunAgent() {
     setRunning(true);
     try {
@@ -145,7 +166,10 @@ export default function App() {
 
   const kpis = brief?.kpis || {};
   const findings = brief?.findings || [];
-  const actions = brief?.pendingActions || [];
+  const actions = brief?.actionItems || brief?.pendingActions || [];
+  const pendingActions = actions.filter((a) => a.status === 'PENDING');
+  const aiProviders = facilitiesSummary?.aiCostByProvider ?? [];
+  const aiMonthlyTotal = Number(facilitiesSummary?.aiMonthlyCostInr ?? 0);
   const delta = kpis.otaDeltaVsPriorMonth;
   const deltaLabel = delta != null ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} vs last mo` : '';
 
@@ -247,29 +271,29 @@ export default function App() {
               ))
             )}
           </div>
-          <div className="panel">
-            <h2>Actions</h2>
+          <div className="panel monitoring-actions">
+            <h2>
+              Actionable insights
+              {pendingActions.length > 0 && (
+                <span className="action-count"> ({pendingActions.length} pending)</span>
+              )}
+            </h2>
             {actions.length === 0 ? (
-              <p style={{ color: '#94a3b8' }}>No pending actions.</p>
+              <p style={{ color: '#94a3b8' }}>No action items yet. Run the agent to draft escalations.</p>
             ) : (
-              actions.map((a) => (
-                <div key={a.id} className="action-card">
-                  <div className="action-type">{a.actionType}</div>
-                  <div className="action-message">{a.draftedMessage}</div>
-                  <div className="action-buttons">
-                    <button
-                      className="confirm"
-                      onClick={() => handleConfirm(a.id)}
-                      disabled={confirming === a.id || a.status !== 'PENDING'}
-                    >
-                      {a.status === 'CONFIRMED' ? 'Confirmed' : confirming === a.id ? 'Confirming…' : 'Confirm'}
-                    </button>
-                    <span className={`status-badge ${a.status === 'PENDING' ? 'pending' : 'confirmed'}`}>
-                      {a.status}
-                    </span>
-                  </div>
-                </div>
-              ))
+              <div className="live-action-list">
+                {actions.map((a) => (
+                  <ActionInsightCard
+                    key={a.id}
+                    action={a}
+                    acting={confirming}
+                    onConfirm={handleConfirm}
+                    onDismiss={handleDismiss}
+                    badgeLabel="Agent"
+                    badgeTitle="Drafted by AgentOrchestrator from July trip data"
+                  />
+                ))}
+              </div>
             )}
           </div>
         </section>
@@ -329,32 +353,39 @@ export default function App() {
 
           <div className="facilities-ai-panel panel">
             <div className="facilities-ai-header">
-              <h2>Monthly AI Expenditure</h2>
-              <span className="facilities-ai-month">
-                {facilitiesSummary?.aiCostMonth ?? 'This month'}
-              </span>
-            </div>
-            <div className="facilities-ai-body">
-              <div className="facilities-ai-stat">
-                <span className="facilities-ai-stat-label">Total spend</span>
-                <span className="facilities-ai-stat-value">
-                  {formatAiCost(facilitiesSummary?.aiMonthlyCostInr)}
-                </span>
+              <div className="facilities-ai-heading">
+                <span className="facilities-ai-title">Monthly AI Expenditure</span>
+                <span className="facilities-ai-month">{facilitiesSummary?.aiCostMonth ?? 'This month'}</span>
               </div>
-              <div className="facilities-ai-stat">
-                <span className="facilities-ai-stat-label">API calls</span>
-                <span className="facilities-ai-stat-value">
-                  {(facilitiesSummary?.aiMonthlyRequestCount ?? 0).toLocaleString()}
-                </span>
-              </div>
-              <div className="facilities-ai-stat">
-                <span className="facilities-ai-stat-label">Providers</span>
-                <span className="facilities-ai-stat-value facilities-ai-providers">OpenAI · Sarvam</span>
+              <div className="facilities-ai-stats">
+                <div className="facilities-ai-stat">
+                  <span className="facilities-ai-stat-label">Total cost</span>
+                  <span className="facilities-ai-stat-value">{formatAiCost(aiMonthlyTotal)}</span>
+                </div>
               </div>
             </div>
-            <p className="facilities-ai-hint">
-              Tracks LLM insights, chat, and voice-to-text usage. See the AI Costs tab for a full breakdown.
-            </p>
+
+            {aiProviders.length > 0 ? (
+              <>
+                <span className="facilities-ai-provider-label">Cost by provider</span>
+                <div className="facilities-ai-providers">
+                  {aiProviders.map((row) => (
+                    <div
+                      key={row.provider}
+                      className={`facilities-ai-provider-chip provider-${row.provider?.toLowerCase()}`}
+                    >
+                      <span className="facilities-ai-provider-name">{row.providerLabel || row.provider}</span>
+                      <span className="facilities-ai-provider-cost">{formatAiCost(row.costInr)}</span>
+                      <span className="facilities-ai-provider-meta">
+                        {row.requestCount} calls · {(row.inputTokens ?? 0).toLocaleString()} in / {(row.outputTokens ?? 0).toLocaleString()} out · {aiProviderPct(row.costInr, facilitiesSummary?.aiMonthlyCostInr)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <span className="facilities-ai-empty">No API usage this month</span>
+            )}
           </div>
 
           {!facilitiesSummary && (

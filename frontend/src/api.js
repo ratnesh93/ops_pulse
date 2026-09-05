@@ -55,6 +55,12 @@ export async function dismissMonitoringAction(id) {
   return res.json();
 }
 
+export async function dismissAction(id) {
+  const res = await fetch(`${API_BASE}/actions/${id}/dismiss`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to dismiss action');
+  return res.json();
+}
+
 export async function confirmAction(id) {
   const res = await fetch(`${API_BASE}/actions/${id}/confirm`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to confirm action');

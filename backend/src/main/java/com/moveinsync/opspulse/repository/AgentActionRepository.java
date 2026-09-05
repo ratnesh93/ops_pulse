@@ -10,4 +10,6 @@ public interface AgentActionRepository extends JpaRepository<AgentAction, Long> 
     List<AgentAction> findByStatusOrderByCreatedAtDesc(String status);
 
     List<AgentAction> findByActionTypeAndStatus(String actionType, String status);
+
+    List<AgentAction> findTop20ByOrderByCreatedAtDesc();
 }

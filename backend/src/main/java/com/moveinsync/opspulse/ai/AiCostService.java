@@ -3,6 +3,7 @@ package com.moveinsync.opspulse.ai;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moveinsync.opspulse.api.dto.AiCostSummaryDto;
+import com.moveinsync.opspulse.api.dto.FacilitiesSummaryDto;
 import com.moveinsync.opspulse.config.OpenAiProperties;
 import com.moveinsync.opspulse.config.SarvamProperties;
 import com.moveinsync.opspulse.domain.AiUsageLog;
@@ -152,6 +153,32 @@ public class AiCostService {
         ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
         String month = now.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
         return month + " " + now.getYear();
+    }
+
+    public List<FacilitiesSummaryDto.AiProviderMonthlyCost> getCurrentMonthCostByProvider() {
+        return repository.aggregateByProviderSince(currentMonthStart()).stream()
+                .map(row -> {
+                    FacilitiesSummaryDto.AiProviderMonthlyCost item = new FacilitiesSummaryDto.AiProviderMonthlyCost();
+                    String provider = (String) row[0];
+                    item.setProvider(provider);
+                    item.setProviderLabel(providerLabel(provider));
+                    item.setRequestCount(((Number) row[1]).longValue());
+                    item.setInputTokens(((Number) row[2]).longValue());
+                    item.setOutputTokens(((Number) row[3]).longValue());
+                    item.setCostInr((BigDecimal) row[4]);
+                    return item;
+                })
+                .toList();
+    }
+
+    private String providerLabel(String provider) {
+        if (PROVIDER_OPENAI.equals(provider)) {
+            return "OpenAI";
+        }
+        if (PROVIDER_SARVAM.equals(provider)) {
+            return "Sarvam AI";
+        }
+        return provider != null ? provider : "Unknown";
     }
 
     private Instant currentMonthStart() {

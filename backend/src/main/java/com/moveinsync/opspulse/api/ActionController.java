@@ -45,4 +45,12 @@ public class ActionController {
                 "status", action.getStatus(),
                 "confirmedAt", action.getConfirmedAt());
     }
+
+    @PostMapping("/actions/{id}/dismiss")
+    public Map<String, Object> dismiss(@PathVariable Long id) {
+        AgentAction action = agentOrchestrator.dismissAction(id);
+        return Map.of(
+                "id", action.getId(),
+                "status", action.getStatus());
+    }
 }

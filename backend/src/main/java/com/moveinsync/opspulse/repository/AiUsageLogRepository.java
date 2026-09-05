@@ -51,4 +51,17 @@ public interface AiUsageLogRepository extends JpaRepository<AiUsageLog, Long> {
             ORDER BY a.provider
             """)
     List<Object[]> aggregateByProvider();
+
+    @Query("""
+            SELECT a.provider,
+                   COUNT(a),
+                   COALESCE(SUM(a.inputTokens), 0),
+                   COALESCE(SUM(a.outputTokens), 0),
+                   COALESCE(SUM(a.cost), 0)
+            FROM AiUsageLog a
+            WHERE a.createdAt >= :since
+            GROUP BY a.provider
+            ORDER BY SUM(a.cost) DESC
+            """)
+    List<Object[]> aggregateByProviderSince(@Param("since") Instant since);
 }

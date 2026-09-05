@@ -2,6 +2,7 @@ package com.moveinsync.opspulse.api;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.moveinsync.opspulse.agent.AgentActionPresenter;
 import com.moveinsync.opspulse.api.dto.BriefResponse;
 import com.moveinsync.opspulse.benchmark.BenchmarkingService;
 import com.moveinsync.opspulse.benchmark.VendorBenchmark;
@@ -23,19 +24,22 @@ import java.util.stream.Collectors;
 public class BriefController {
 
     private final BenchmarkingService benchmarkingService;
-    private final FindingRepository findingRepository;
     private final AgentActionRepository agentActionRepository;
+    private final FindingRepository findingRepository;
     private final ObjectMapper objectMapper;
+    private final AgentActionPresenter agentActionPresenter;
 
     public BriefController(
             BenchmarkingService benchmarkingService,
             FindingRepository findingRepository,
             AgentActionRepository agentActionRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AgentActionPresenter agentActionPresenter) {
         this.benchmarkingService = benchmarkingService;
         this.findingRepository = findingRepository;
         this.agentActionRepository = agentActionRepository;
         this.objectMapper = objectMapper;
+        this.agentActionPresenter = agentActionPresenter;
     }
 
     @GetMapping("/brief")
@@ -60,9 +64,13 @@ public class BriefController {
                 .map(this::toFindingDto)
                 .collect(Collectors.toList()));
 
-        response.setPendingActions(agentActionRepository.findByStatusOrderByCreatedAtDesc("PENDING")
+        List<BriefResponse.ActionDto> actionItems = agentActionRepository.findTop20ByOrderByCreatedAtDesc()
                 .stream()
                 .map(this::toActionDto)
+                .collect(Collectors.toList());
+        response.setActionItems(actionItems);
+        response.setPendingActions(actionItems.stream()
+                .filter(a -> "PENDING".equals(a.getStatus()))
                 .collect(Collectors.toList()));
 
         response.setMorningBrief(benchmarkingService.buildMorningBrief(
@@ -90,8 +98,43 @@ public class BriefController {
         dto.setActionType(action.getActionType());
         dto.setDraftedMessage(action.getDraftedMessage());
         dto.setStatus(action.getStatus());
-        dto.setPayload(parseJson(action.getPayloadJson()));
+        Map<String, Object> payload = parseJson(action.getPayloadJson());
+        dto.setPayload(payload);
+
+        Finding finding = null;
+        if (action.getFindingId() != null) {
+            finding = findingRepository.findById(action.getFindingId()).orElse(null);
+        }
+        agentActionPresenter.enrich(action, finding, payload, new ActionDtoAdapter(dto));
         return dto;
+    }
+
+    private static final class ActionDtoAdapter implements AgentActionPresenter.AgentActionView {
+        private final BriefResponse.ActionDto dto;
+
+        private ActionDtoAdapter(BriefResponse.ActionDto dto) {
+            this.dto = dto;
+        }
+
+        @Override
+        public void setTitle(String title) {
+            dto.setTitle(title);
+        }
+
+        @Override
+        public void setSeverity(String severity) {
+            dto.setSeverity(severity);
+        }
+
+        @Override
+        public void setAiInsight(String aiInsight) {
+            dto.setAiInsight(aiInsight);
+        }
+
+        @Override
+        public void setRecommendedAction(String recommendedAction) {
+            dto.setRecommendedAction(recommendedAction);
+        }
     }
 
     private Map<String, Object> parseJson(String json) {

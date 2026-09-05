@@ -9,6 +9,7 @@ public class BriefResponse {
     private KpiBar kpis;
     private MorningBrief morningBrief;
     private List<FindingDto> findings;
+    private List<ActionDto> actionItems;
     private List<ActionDto> pendingActions;
 
     public MorningBrief getMorningBrief() {
@@ -33,6 +34,14 @@ public class BriefResponse {
 
     public void setFindings(List<FindingDto> findings) {
         this.findings = findings;
+    }
+
+    public List<ActionDto> getActionItems() {
+        return actionItems;
+    }
+
+    public void setActionItems(List<ActionDto> actionItems) {
+        this.actionItems = actionItems;
     }
 
     public List<ActionDto> getPendingActions() {
@@ -266,6 +275,10 @@ public class BriefResponse {
         private String draftedMessage;
         private String status;
         private Map<String, Object> payload;
+        private String title;
+        private String severity;
+        private String aiInsight;
+        private String recommendedAction;
 
         public Long getId() {
             return id;
@@ -313,6 +326,38 @@ public class BriefResponse {
 
         public void setPayload(Map<String, Object> payload) {
             this.payload = payload;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public String getSeverity() {
+            return severity;
+        }
+
+        public void setSeverity(String severity) {
+            this.severity = severity;
+        }
+
+        public String getAiInsight() {
+            return aiInsight;
+        }
+
+        public void setAiInsight(String aiInsight) {
+            this.aiInsight = aiInsight;
+        }
+
+        public String getRecommendedAction() {
+            return recommendedAction;
+        }
+
+        public void setRecommendedAction(String recommendedAction) {
+            this.recommendedAction = recommendedAction;
         }
     }
 }

@@ -7,6 +7,7 @@ import {
   fetchMonitoringScenarios,
   simulateMonitoringFeed,
 } from './api';
+import ActionInsightCard from './ActionInsightCard';
 
 const SIM_PANEL_STORAGE_KEY = 'opspulse-hide-sim-panel';
 
@@ -302,49 +303,23 @@ export default function MonitoringPanel() {
           ) : (
             <div className="live-action-list">
               {actions.map((a) => (
-                <div key={a.id} className={`live-action-card severity-${a.severity?.toLowerCase()}`}>
-                  <div className="live-action-top">
-                    <span className={`status-badge ${a.status === 'PENDING' ? 'pending' : 'confirmed'}`}>
-                      {a.status}
-                    </span>
-                    <span className="action-type-tag">{a.actionType}</span>
-                    {(data?.openAiConfigured || (a.openaiModel && a.openaiModel !== 'template-fallback')) && (
-                      <span
-                        className="ai-badge"
-                        title={
-                          a.openaiModel && a.openaiModel !== 'template-fallback'
-                            ? a.openaiModel
-                            : 'OpenAI insights enabled'
-                        }
-                      >
-                        OpenAI
-                      </span>
-                    )}
-                  </div>
-                  <strong>{a.title}</strong>
-                  <p className="ai-insight">{a.aiInsight}</p>
-                  <div className="recommended-action">
-                    <span className="rec-label">Recommended:</span> {a.recommendedAction}
-                  </div>
-                  {a.status === 'PENDING' && (
-                    <div className="action-buttons">
-                      <button
-                        className="confirm"
-                        onClick={() => handleConfirm(a.id)}
-                        disabled={acting === a.id}
-                      >
-                        {acting === a.id ? '…' : 'Confirm'}
-                      </button>
-                      <button
-                        className="dismiss-btn"
-                        onClick={() => handleDismiss(a.id)}
-                        disabled={acting === a.id}
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <ActionInsightCard
+                  key={a.id}
+                  action={a}
+                  acting={acting}
+                  onConfirm={handleConfirm}
+                  onDismiss={handleDismiss}
+                  badgeLabel={
+                    data?.openAiConfigured || (a.openaiModel && a.openaiModel !== 'template-fallback')
+                      ? 'OpenAI'
+                      : null
+                  }
+                  badgeTitle={
+                    a.openaiModel && a.openaiModel !== 'template-fallback'
+                      ? a.openaiModel
+                      : 'OpenAI insights enabled'
+                  }
+                />
               ))}
             </div>
           )}

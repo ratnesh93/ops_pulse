@@ -1,6 +1,7 @@
 package com.moveinsync.opspulse.api.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public class FacilitiesSummaryDto {
 
@@ -20,6 +21,7 @@ public class FacilitiesSummaryDto {
     private BigDecimal aiMonthlyCostInr;
     private long aiMonthlyRequestCount;
     private String aiCostMonth;
+    private List<AiProviderMonthlyCost> aiCostByProvider;
 
     public double getFleetOtaPct() {
         return fleetOtaPct;
@@ -147,5 +149,70 @@ public class FacilitiesSummaryDto {
 
     public void setAiCostMonth(String aiCostMonth) {
         this.aiCostMonth = aiCostMonth;
+    }
+
+    public List<AiProviderMonthlyCost> getAiCostByProvider() {
+        return aiCostByProvider;
+    }
+
+    public void setAiCostByProvider(List<AiProviderMonthlyCost> aiCostByProvider) {
+        this.aiCostByProvider = aiCostByProvider;
+    }
+
+    public static class AiProviderMonthlyCost {
+        private String provider;
+        private String providerLabel;
+        private long requestCount;
+        private long inputTokens;
+        private long outputTokens;
+        private BigDecimal costInr;
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String provider) {
+            this.provider = provider;
+        }
+
+        public String getProviderLabel() {
+            return providerLabel;
+        }
+
+        public void setProviderLabel(String providerLabel) {
+            this.providerLabel = providerLabel;
+        }
+
+        public long getRequestCount() {
+            return requestCount;
+        }
+
+        public void setRequestCount(long requestCount) {
+            this.requestCount = requestCount;
+        }
+
+        public long getInputTokens() {
+            return inputTokens;
+        }
+
+        public void setInputTokens(long inputTokens) {
+            this.inputTokens = inputTokens;
+        }
+
+        public long getOutputTokens() {
+            return outputTokens;
+        }
+
+        public void setOutputTokens(long outputTokens) {
+            this.outputTokens = outputTokens;
+        }
+
+        public BigDecimal getCostInr() {
+            return costInr;
+        }
+
+        public void setCostInr(BigDecimal costInr) {
+            this.costInr = costInr;
+        }
     }
 }

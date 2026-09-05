@@ -150,6 +150,23 @@ public class AgentOrchestrator {
         return action;
     }
 
+    @Transactional
+    public AgentAction dismissAction(Long actionId) {
+        AgentAction action = agentActionRepository.findById(actionId)
+                .orElseThrow(() -> new IllegalArgumentException("Action not found: " + actionId));
+
+        if (!"PENDING".equals(action.getStatus())) {
+            throw new IllegalStateException("Action is not pending: " + action.getStatus());
+        }
+
+        action.setStatus("DISMISSED");
+        agentActionRepository.save(action);
+
+        UUID runId = UUID.randomUUID();
+        audit(runId, "ACT", String.format("DISMISSED %s (action #%d)", action.getActionType(), actionId));
+        return action;
+    }
+
     private Finding upsertFinding(
             String type,
             String severity,

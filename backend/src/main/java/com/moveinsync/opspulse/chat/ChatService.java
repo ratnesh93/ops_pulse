@@ -323,11 +323,18 @@ public class ChatService {
 
     private String facilitiesSummaryReply() {
         FacilitiesSummaryDto s = benchmarkingService.buildFacilitiesSummary();
+        String providerSplit = "";
+        if (s.getAiCostByProvider() != null && !s.getAiCostByProvider().isEmpty()) {
+            providerSplit = s.getAiCostByProvider().stream()
+                    .map(p -> p.getProviderLabel() + " " + formatAiCost(p.getCostInr()))
+                    .collect(Collectors.joining(", "));
+            providerSplit = " Provider split: " + providerSplit + ".";
+        }
         return String.format(
                 "Fleet aggregate (July): OTA %.1f%%, cost %s, %.0f/km across %,d km. "
                         + "Safety alerts: %,d (%d Sev-1, %d panic). %d of %d vendors below SLA. "
                         + "Highest cost/km: %s. Lowest OTA: %s (%.1f%%). "
-                        + "AI ops spend (%s): %s (%d API calls).",
+                        + "AI API spend (%s): %s (%d API calls).%s",
                 s.getFleetOtaPct(),
                 formatCost(s.getTotalCost()),
                 s.getCostPerKm() != null ? s.getCostPerKm().doubleValue() : 0,
@@ -342,7 +349,8 @@ public class ChatService {
                 s.getLowestOtaPct(),
                 s.getAiCostMonth() != null ? s.getAiCostMonth() : "this month",
                 formatAiCost(s.getAiMonthlyCostInr()),
-                s.getAiMonthlyRequestCount());
+                s.getAiMonthlyRequestCount(),
+                providerSplit);
     }
 
     private String vendorScorecardReply(String q) {

@@ -168,6 +168,7 @@ public class BenchmarkingService {
         summary.setAiMonthlyCostInr(aiCostService.getCurrentMonthCostInr());
         summary.setAiMonthlyRequestCount(aiCostService.getCurrentMonthRequestCount());
         summary.setAiCostMonth(aiCostService.getCurrentMonthLabel());
+        summary.setAiCostByProvider(aiCostService.getCurrentMonthCostByProvider());
 
         return summary;
     }

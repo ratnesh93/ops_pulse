@@ -4,6 +4,28 @@ Agentic intelligence layer for enterprise employee mobility — MoveInSync hacka
 
 Ops Pulse ingests real MoveInSync trip data, benchmarks vendor SLA performance, and runs an agent loop that surfaces findings and draft actions for human confirmation.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Client
+        Browser["Browser :4210"]
+    end
+
+    subgraph Stack["Docker Compose / Render"]
+        FE["React UI<br/>nginx proxy /api"]
+        BE["Spring Boot API :8090"]
+        PG[("PostgreSQL")]
+    end
+
+    CSV["MoveInSync CSVs"] --> BE
+    Browser --> FE --> BE --> PG
+    BE -.-> OpenAI
+    BE -.-> Sarvam
+```
+
+See full diagrams (agent cycle, monitoring, data ingest) in [MoveInSync_Architecture_Document.md](../MoveInSync_Architecture_Document.md#3-high-level-design).
+
 ## Features
 
 - **Morning brief** — pre-shift summary with attention count, vendors below SLA, OTA rank, cost at risk

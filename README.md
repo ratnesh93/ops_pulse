@@ -6,25 +6,35 @@ Ops Pulse ingests real MoveInSync trip data, benchmarks vendor SLA performance, 
 
 ## Architecture
 
+### End-to-end data flow
+
 ```mermaid
 flowchart LR
-    subgraph Client
-        Browser["Browser :4210"]
-    end
-
-    subgraph Stack["Docker Compose / Render"]
-        FE["React UI<br/>nginx proxy /api"]
-        BE["Spring Boot API :8090"]
-        PG[("PostgreSQL")]
-    end
-
-    CSV["MoveInSync CSVs"] --> BE
-    Browser --> FE --> BE --> PG
-    BE -.-> OpenAI
-    BE -.-> Sarvam
+    CSV["MoveInSync CSVs"] --> INGEST["DatasetAdapter"]
+    INGEST --> PG[("PostgreSQL")]
+    PG --> AGENT["AgentOrchestrator<br/>SENSE → REASON → DECIDE → ACT"]
+    AGENT --> PG
+    PG --> API["REST /api/brief"]
+    API --> UI["React Dashboard"]
+    UI -->|"Confirm"| API
+    API --> PG
 ```
 
-See full diagrams (agent cycle, monitoring, data ingest) in [MoveInSync_Architecture_Document.md](../MoveInSync_Architecture_Document.md#3-high-level-design).
+### Agentic layer (working)
+
+```mermaid
+flowchart TB
+    T["Triggers<br/>startup · Run Agent Now"] --> AO["AgentOrchestrator"]
+    AO --> S["SENSE<br/>trips · alerts · capacity"]
+    S --> R["REASON<br/>OTA · SLA · attribution"]
+    R --> D["DECIDE<br/>Java rule gates"]
+    D --> A["ACT<br/>draft findings + PENDING actions"]
+    A --> AL[("agent_audit_log")]
+    A --> UI["Dashboard<br/>human Confirm"]
+    UI --> C["CONFIRMED"]
+```
+
+Full diagrams: [MoveInSync_Architecture_Document.md](../MoveInSync_Architecture_Document.md#3-high-level-design)
 
 ## Features
 

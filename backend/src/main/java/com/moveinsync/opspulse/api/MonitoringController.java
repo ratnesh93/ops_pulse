@@ -1,12 +1,14 @@
 package com.moveinsync.opspulse.api;
 
 import com.moveinsync.opspulse.api.dto.MonitoringDashboardDto;
+import com.moveinsync.opspulse.api.dto.MonitoringScenarioDto;
 import com.moveinsync.opspulse.domain.LiveActionItem;
 import com.moveinsync.opspulse.monitoring.MonitoringService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -28,13 +30,15 @@ public class MonitoringController {
     }
 
     @GetMapping("/scenarios")
-    public List<String> scenarios() {
-        return monitoringService.listScenarios();
+    public List<MonitoringScenarioDto> scenarios() {
+        return monitoringService.listScenarioOptions();
     }
 
     @PostMapping("/simulate/{scenario}")
-    public MonitoringDashboardDto simulate(@PathVariable String scenario) {
-        return monitoringService.simulateFeed(scenario);
+    public MonitoringDashboardDto simulate(
+            @PathVariable String scenario,
+            @RequestParam(defaultValue = "rohan") String vendor) {
+        return monitoringService.simulateFeed(scenario, vendor);
     }
 
     @PostMapping("/actions/{id}/confirm")

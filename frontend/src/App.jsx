@@ -9,6 +9,7 @@ import {
   fetchActivityLog,
   fetchAiCosts,
   fetchBrief,
+  fetchFacilitiesSummary,
   fetchMemo,
   runAgent,
 } from './api';
@@ -22,6 +23,13 @@ function formatCost(value) {
   return `₹${num.toLocaleString()}`;
 }
 
+function formatAiCost(value) {
+  const num = Number(value ?? 0);
+  if (num >= 1) return `₹${num.toFixed(2)}`;
+  if (num >= 0.01) return `₹${num.toFixed(4)}`;
+  return `₹${num.toFixed(6)}`;
+}
+
 function formatTime(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -33,6 +41,7 @@ export default function App() {
   const [brief, setBrief] = useState(null);
   const [log, setLog] = useState([]);
   const [memo, setMemo] = useState('');
+  const [facilitiesSummary, setFacilitiesSummary] = useState(null);
   const [aiCosts, setAiCosts] = useState(null);
   const [aiCostsLoading, setAiCostsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -56,10 +65,12 @@ export default function App() {
 
   const loadFacilitiesData = useCallback(async () => {
     try {
-      const memoData = await fetchMemo();
+      const [memoData, summary] = await Promise.all([fetchMemo(), fetchFacilitiesSummary()]);
       setMemo(memoData.memo || '');
+      setFacilitiesSummary(summary);
     } catch {
       setMemo('Leadership memo not yet generated. Run the agent first.');
+      setFacilitiesSummary(null);
     }
   }, []);
 
@@ -84,6 +95,8 @@ export default function App() {
   useEffect(() => {
     if (view === 'facilities') {
       loadFacilitiesData();
+      const interval = setInterval(loadFacilitiesData, 10000);
+      return () => clearInterval(interval);
     }
     if (view === 'ai-costs') {
       loadAiCosts();
@@ -262,6 +275,92 @@ export default function App() {
         </section>
       ) : view === 'facilities' ? (
         <section className="facilities-panel">
+          {facilitiesSummary && (
+            <div className="facilities-aggregate panel">
+              <h2>Fleet Aggregate — July 2026</h2>
+              <div className="facilities-kpi-grid">
+                <div className="facilities-kpi">
+                  <span className="facilities-kpi-label">Fleet OTA</span>
+                  <span className={`facilities-kpi-value ${facilitiesSummary.fleetOtaPct < 90 ? 'bad' : 'good'}`}>
+                    {facilitiesSummary.fleetOtaPct?.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="facilities-kpi">
+                  <span className="facilities-kpi-label">Total Cost</span>
+                  <span className="facilities-kpi-value">{formatCost(facilitiesSummary.totalCost)}</span>
+                </div>
+                <div className="facilities-kpi">
+                  <span className="facilities-kpi-label">Cost / km</span>
+                  <span className="facilities-kpi-value">
+                    {facilitiesSummary.costPerKm != null ? `₹${Number(facilitiesSummary.costPerKm).toFixed(0)}/km` : '—'}
+                  </span>
+                </div>
+                <div className="facilities-kpi">
+                  <span className="facilities-kpi-label">Distance</span>
+                  <span className="facilities-kpi-value">
+                    {facilitiesSummary.totalKm != null ? `${Math.round(Number(facilitiesSummary.totalKm)).toLocaleString()} km` : '—'}
+                  </span>
+                </div>
+                <div className="facilities-kpi">
+                  <span className="facilities-kpi-label">Safety alerts (Jul)</span>
+                  <span className="facilities-kpi-value bad">
+                    {facilitiesSummary.safetyIncidentCount?.toLocaleString() ?? '0'}
+                  </span>
+                  <span className="facilities-kpi-sub">
+                    {facilitiesSummary.sev1Count} Sev-1 · {facilitiesSummary.panicCount} panic
+                  </span>
+                </div>
+                <div className="facilities-kpi">
+                  <span className="facilities-kpi-label">Vendors Below SLA</span>
+                  <span className="facilities-kpi-value bad">
+                    {facilitiesSummary.vendorsBelowSla} / {facilitiesSummary.vendorCount}
+                  </span>
+                </div>
+              </div>
+              <p className="facilities-highlight">
+                Highest cost/km: <strong>{facilitiesSummary.highestCostPerKmVendor ?? '—'}</strong>
+                {facilitiesSummary.highestCostPerKm != null && ` (₹${Number(facilitiesSummary.highestCostPerKm).toFixed(0)}/km)`}
+                {' · '}
+                Lowest OTA: <strong>{facilitiesSummary.lowestOtaVendor ?? '—'}</strong>
+                {facilitiesSummary.lowestOtaPct != null && ` (${facilitiesSummary.lowestOtaPct.toFixed(1)}%)`}
+              </p>
+            </div>
+          )}
+
+          <div className="facilities-ai-panel panel">
+            <div className="facilities-ai-header">
+              <h2>Monthly AI Expenditure</h2>
+              <span className="facilities-ai-month">
+                {facilitiesSummary?.aiCostMonth ?? 'This month'}
+              </span>
+            </div>
+            <div className="facilities-ai-body">
+              <div className="facilities-ai-stat">
+                <span className="facilities-ai-stat-label">Total spend</span>
+                <span className="facilities-ai-stat-value">
+                  {formatAiCost(facilitiesSummary?.aiMonthlyCostInr)}
+                </span>
+              </div>
+              <div className="facilities-ai-stat">
+                <span className="facilities-ai-stat-label">API calls</span>
+                <span className="facilities-ai-stat-value">
+                  {(facilitiesSummary?.aiMonthlyRequestCount ?? 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="facilities-ai-stat">
+                <span className="facilities-ai-stat-label">Providers</span>
+                <span className="facilities-ai-stat-value facilities-ai-providers">OpenAI · Sarvam</span>
+              </div>
+            </div>
+            <p className="facilities-ai-hint">
+              Tracks LLM insights, chat, and voice-to-text usage. See the AI Costs tab for a full breakdown.
+            </p>
+          </div>
+
+          {!facilitiesSummary && (
+            <p className="loading">Loading fleet aggregate…</p>
+          )}
+
           <div className="memo-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>Leadership Memo</h2>
@@ -278,6 +377,7 @@ export default function App() {
         <ChatPanel />
       ) : null}
 
+      {view === 'transport' && (
       <section className="log-panel" style={{ marginTop: '1.5rem' }}>
         <h2>Agent Activity Log</h2>
         {log.length === 0 ? (
@@ -292,6 +392,7 @@ export default function App() {
           ))
         )}
       </section>
+      )}
 
       <button
         type="button"

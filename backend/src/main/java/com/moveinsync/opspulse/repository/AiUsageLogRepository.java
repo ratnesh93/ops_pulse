@@ -3,8 +3,10 @@ package com.moveinsync.opspulse.repository;
 import com.moveinsync.opspulse.domain.AiUsageLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 public interface AiUsageLogRepository extends JpaRepository<AiUsageLog, Long> {
@@ -19,6 +21,12 @@ public interface AiUsageLogRepository extends JpaRepository<AiUsageLog, Long> {
 
     @Query("SELECT COALESCE(SUM(a.outputTokens), 0) FROM AiUsageLog a")
     long sumOutputTokens();
+
+    @Query("SELECT COALESCE(SUM(a.cost), 0) FROM AiUsageLog a WHERE a.createdAt >= :since")
+    BigDecimal sumCostSince(@Param("since") Instant since);
+
+    @Query("SELECT COUNT(a) FROM AiUsageLog a WHERE a.createdAt >= :since")
+    long countSince(@Param("since") Instant since);
 
     @Query("""
             SELECT a.operationType,

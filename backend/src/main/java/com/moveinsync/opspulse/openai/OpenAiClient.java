@@ -37,14 +37,29 @@ public class OpenAiClient {
     }
 
     public ChatCompletionResult chat(String systemPrompt, String userPrompt) {
+        return complete(systemPrompt, userPrompt, true);
+    }
+
+    public ChatCompletionResult chatText(String systemPrompt, String userPrompt) {
+        return complete(systemPrompt, userPrompt, false);
+    }
+
+    private ChatCompletionResult complete(String systemPrompt, String userPrompt, boolean jsonMode) {
         if (!properties.isConfigured()) {
             throw new IllegalStateException("OpenAI API key not configured. Set OPENAI_API_KEY in .env");
         }
 
-        Map<String, Object> body = Map.of(
+        Map<String, Object> body = jsonMode
+                ? Map.of(
                 "model", properties.getModel(),
                 "temperature", 0.3,
                 "response_format", Map.of("type", "json_object"),
+                "messages", List.of(
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "user", "content", userPrompt)))
+                : Map.of(
+                "model", properties.getModel(),
+                "temperature", 0.3,
                 "messages", List.of(
                         Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", userPrompt)));

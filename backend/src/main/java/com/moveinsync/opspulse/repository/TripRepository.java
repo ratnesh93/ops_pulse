@@ -35,6 +35,36 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
             """, nativeQuery = true)
     List<Object[]> aggregateMetricsByVendor();
 
+    @Query("SELECT t.id, t.vendorId FROM Trip t WHERE t.id IN :ids")
+    List<Object[]> findVendorIdsByTripIds(@Param("ids") List<Long> ids);
+
+    @Query("SELECT DISTINCT t.office FROM Trip t WHERE t.office IS NOT NULL ORDER BY t.office")
+    List<String> findDistinctOffices();
+
+    long countByOffice(String office);
+
+    @Query("SELECT COUNT(t) FROM Trip t WHERE t.office = :office AND t.onTime = true")
+    long countOnTimeByOffice(@Param("office") String office);
+
+    @Query("SELECT COUNT(t) FROM Trip t WHERE t.office = :office AND t.onTime = false")
+    long countDelayedByOffice(@Param("office") String office);
+
+    @Query("SELECT COUNT(DISTINCT t.routeId) FROM Trip t WHERE t.office = :office AND t.routeId LIKE '%-LOGIN'")
+    long countDistinctLoginRoutesByOffice(@Param("office") String office);
+
+    @Query("SELECT COUNT(DISTINCT t.routeId) FROM Trip t WHERE t.office = :office AND t.routeId LIKE '%-LOGOUT'")
+    long countDistinctLogoutRoutesByOffice(@Param("office") String office);
+
+    @Query(value = """
+            SELECT vendor_id, COUNT(*) AS delayed_count
+            FROM trips
+            WHERE on_time = false
+            GROUP BY vendor_id
+            ORDER BY delayed_count DESC
+            LIMIT 10
+            """, nativeQuery = true)
+    List<Object[]> topVendorsByDelayedTrips();
+
     @Query(value = """
             SELECT office, shift_id,
                    SUM(occupancy) AS total_riders,

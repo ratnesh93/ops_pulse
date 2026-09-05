@@ -13,7 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.TextStyle;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -134,6 +138,28 @@ public class AiCostService {
                 .toList());
 
         return summary;
+    }
+
+    public BigDecimal getCurrentMonthCostInr() {
+        return repository.sumCostSince(currentMonthStart());
+    }
+
+    public long getCurrentMonthRequestCount() {
+        return repository.countSince(currentMonthStart());
+    }
+
+    public String getCurrentMonthLabel() {
+        ZonedDateTime now = ZonedDateTime.now(ZoneId.systemDefault());
+        String month = now.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        return month + " " + now.getYear();
+    }
+
+    private Instant currentMonthStart() {
+        return ZonedDateTime.now(ZoneId.systemDefault())
+                .withDayOfMonth(1)
+                .toLocalDate()
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant();
     }
 
     public int estimateTextTokens(String text) {

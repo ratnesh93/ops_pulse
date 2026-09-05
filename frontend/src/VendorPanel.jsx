@@ -15,6 +15,11 @@ function formatCostShort(value) {
   return `₹${num.toFixed(0)}`;
 }
 
+function formatCostPerKm(value) {
+  if (!value) return '—';
+  return `₹${Number(value).toFixed(0)}/km`;
+}
+
 export default function VendorPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -74,7 +79,9 @@ export default function VendorPanel() {
               <th onClick={() => toggleSort('priorMonthOtaPct')}>Prior Mo %{sortIcon('priorMonthOtaPct')}</th>
               <th onClick={() => toggleSort('tripCount')}>Trips{sortIcon('tripCount')}</th>
               <th onClick={() => toggleSort('totalCost')}>Cost{sortIcon('totalCost')}</th>
+              <th onClick={() => toggleSort('costPerKm')}>Cost/km{sortIcon('costPerKm')}</th>
               <th onClick={() => toggleSort('costPerOnTimeTrip')}>Cost/on-time{sortIcon('costPerOnTimeTrip')}</th>
+              <th onClick={() => toggleSort('safetyIncidentCount')}>Safety alerts (Jul){sortIcon('safetyIncidentCount')}</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -93,7 +100,15 @@ export default function VendorPanel() {
                 <td>{v.priorMonthOtaPct != null ? `${v.priorMonthOtaPct.toFixed(1)}%` : '—'}</td>
                 <td>{v.tripCount.toLocaleString()}</td>
                 <td>{formatCost(v.totalCost)}</td>
+                <td>{formatCostPerKm(v.costPerKm)}</td>
                 <td>{formatCostShort(v.costPerOnTimeTrip)}</td>
+                <td
+                  className={v.sev1Count > 0 ? 'safety-bad' : v.safetyIncidentCount > 0 ? 'safety-warn' : 'safety-ok'}
+                  title={`${v.safetyIncidentCount ?? 0} July safety alerts · ${v.sev1Count ?? 0} Sev-1 · ${v.panicCount ?? 0} panic`}
+                >
+                  {(v.safetyIncidentCount ?? 0).toLocaleString()}
+                  {(v.sev1Count ?? 0) > 0 && <span className="safety-detail"> ({v.sev1Count} Sev-1)</span>}
+                </td>
                 <td>
                   <span className={`status-badge ${v.slaBreach ? 'pending' : 'confirmed'}`}>
                     {v.slaBreach ? 'BREACH' : 'OK'}

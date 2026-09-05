@@ -18,6 +18,10 @@ public class VendorSummaryDto {
     private Double peerGapPct;
     private BigDecimal costPerOnTimeTrip;
     private long onTimeTripCount;
+    private BigDecimal costPerKm;
+    private long safetyIncidentCount;
+    private long sev1Count;
+    private long panicCount;
 
     public String getVendorId() {
         return vendorId;
@@ -129,5 +133,37 @@ public class VendorSummaryDto {
 
     public void setOnTimeTripCount(long onTimeTripCount) {
         this.onTimeTripCount = onTimeTripCount;
+    }
+
+    public BigDecimal getCostPerKm() {
+        return costPerKm;
+    }
+
+    public void setCostPerKm(BigDecimal costPerKm) {
+        this.costPerKm = costPerKm;
+    }
+
+    public long getSafetyIncidentCount() {
+        return safetyIncidentCount;
+    }
+
+    public void setSafetyIncidentCount(long safetyIncidentCount) {
+        this.safetyIncidentCount = safetyIncidentCount;
+    }
+
+    public long getSev1Count() {
+        return sev1Count;
+    }
+
+    public void setSev1Count(long sev1Count) {
+        this.sev1Count = sev1Count;
+    }
+
+    public long getPanicCount() {
+        return panicCount;
+    }
+
+    public void setPanicCount(long panicCount) {
+        this.panicCount = panicCount;
     }
 }

@@ -1,36 +1,36 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   confirmMonitoringAction,
   dismissMonitoringAction,
+  fetchActivityLog,
   fetchMonitoring,
+  fetchMonitoringScenarios,
   simulateMonitoringFeed,
 } from './api';
 
-const SCENARIOS = [
-  {
-    id: 'NEGATIVE_DRIVER_ABSENT',
-    label: '4 drivers absent',
-    sentiment: 'negative',
-    description: 'Cedar Ridge 08:00 — no-shows',
-  },
-  {
-    id: 'NEGATIVE_DELAY_SPIKE',
-    label: 'ETA slip +18 min',
-    sentiment: 'negative',
-    description: 'Rohan Travel route delays',
-  },
-  {
-    id: 'POSITIVE_OTA_RECOVERY',
-    label: 'OTA recovery 96%',
-    sentiment: 'positive',
-    description: 'Priya Travel morning shift',
-  },
-  {
-    id: 'NEUTRAL_OCCUPANCY',
-    label: 'Occupancy normal',
-    sentiment: 'neutral',
-    description: 'Clearwater 15:30 at 82%',
-  },
+const SIM_PANEL_STORAGE_KEY = 'opspulse-hide-sim-panel';
+
+function readSimPanelHidden() {
+  try {
+    return localStorage.getItem(SIM_PANEL_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+const VENDORS = [
+  { id: 'rohan', label: 'Rohan Travel (Vendor B) — focus vendor' },
+  { id: 'priya', label: 'Priya Travel — peer vendor' },
+];
+
+const FALLBACK_SCENARIOS = [
+  { id: 'NEGATIVE_ROAD_BLOCK', label: 'Road block on route', sentiment: 'NEGATIVE', description: 'ORR corridor closure' },
+  { id: 'NEGATIVE_ETA_MISSED', label: 'ETA missed for vendor', sentiment: 'NEGATIVE', description: 'Trip past pickup window' },
+  { id: 'NEGATIVE_DRIVER_ABSENT', label: 'Drivers absent', sentiment: 'NEGATIVE', description: 'No-shows at login shift' },
+  { id: 'NEGATIVE_DELAY_SPIKE', label: 'ETA slip spike', sentiment: 'NEGATIVE', description: 'Sustained route delays' },
+  { id: 'NEGATIVE_VEHICLE_BREAKDOWN', label: 'Vehicle breakdown', sentiment: 'NEGATIVE', description: 'Shuttle stranded' },
+  { id: 'POSITIVE_OTA_RECOVERY', label: 'OTA recovery', sentiment: 'POSITIVE', description: 'Vendor back above SLA' },
+  { id: 'POSITIVE_ROUTE_CLEARED', label: 'Road block cleared', sentiment: 'POSITIVE', description: 'Corridor reopened' },
+  { id: 'NEUTRAL_OCCUPANCY', label: 'Occupancy normal', sentiment: 'NEUTRAL', description: 'Within capacity range' },
 ];
 
 function formatTime(iso) {
@@ -45,17 +45,56 @@ function sentimentClass(sentiment) {
   return 'sentiment-neutral';
 }
 
+function sentimentLogClass(sentiment) {
+  if (sentiment === 'POSITIVE') return 'log-stage-positive';
+  if (sentiment === 'NEGATIVE') return 'log-stage-negative';
+  return 'log-stage-neutral';
+}
+
+function groupScenarios(scenarios) {
+  const groups = { NEGATIVE: [], POSITIVE: [], NEUTRAL: [] };
+  for (const s of scenarios) {
+    const bucket = groups[s.sentiment] ?? groups.NEUTRAL;
+    bucket.push(s);
+  }
+  return groups;
+}
+
 export default function MonitoringPanel() {
   const [data, setData] = useState(null);
+  const [scenarios, setScenarios] = useState(FALLBACK_SCENARIOS);
+  const [agentLog, setAgentLog] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [feeding, setFeeding] = useState(null);
+  const [feeding, setFeeding] = useState(false);
   const [acting, setActing] = useState(null);
   const [error, setError] = useState(null);
+  const [vendor, setVendor] = useState('rohan');
+  const [scenario, setScenario] = useState('NEGATIVE_ROAD_BLOCK');
+  const [simPanelHidden, setSimPanelHidden] = useState(readSimPanelHidden);
+
+  function hideSimPanel() {
+    setSimPanelHidden(true);
+    try {
+      localStorage.setItem(SIM_PANEL_STORAGE_KEY, 'true');
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  function showSimPanel() {
+    setSimPanelHidden(false);
+    try {
+      localStorage.removeItem(SIM_PANEL_STORAGE_KEY);
+    } catch {
+      // ignore storage errors
+    }
+  }
 
   const refresh = useCallback(async () => {
     try {
-      const dashboard = await fetchMonitoring();
+      const [dashboard, log] = await Promise.all([fetchMonitoring(), fetchActivityLog()]);
       setData(dashboard);
+      setAgentLog(log);
       setError(null);
     } catch (e) {
       setError(e.message);
@@ -65,21 +104,37 @@ export default function MonitoringPanel() {
   }, []);
 
   useEffect(() => {
+    fetchMonitoringScenarios()
+      .then((list) => {
+        if (list?.length) {
+          setScenarios(list);
+          setScenario((prev) => (list.some((s) => s.id === prev) ? prev : list[0].id));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     refresh();
     const interval = setInterval(refresh, 5000);
     return () => clearInterval(interval);
   }, [refresh]);
 
-  async function handleSimulate(scenarioId) {
-    setFeeding(scenarioId);
+  const scenarioGroups = useMemo(() => groupScenarios(scenarios), [scenarios]);
+
+  async function handleSimulate() {
+    if (!scenario) return;
+    setFeeding(true);
     try {
-      const dashboard = await simulateMonitoringFeed(scenarioId);
+      const dashboard = await simulateMonitoringFeed(scenario, vendor);
       setData(dashboard);
       setError(null);
+      const log = await fetchActivityLog();
+      setAgentLog(log);
     } catch (e) {
       setError(e.message);
     } finally {
-      setFeeding(null);
+      setFeeding(false);
     }
   }
 
@@ -107,13 +162,35 @@ export default function MonitoringPanel() {
     }
   }
 
+  const activityStream = useMemo(() => {
+    const feedEntries = (data?.feedEvents ?? []).map((e) => ({
+      id: `feed-${e.id}`,
+      timestamp: e.createdAt,
+      stage: e.sentiment,
+      stageClass: sentimentLogClass(e.sentiment),
+      message: `${e.title} — ${e.detail} (${e.office} · ${e.shiftId})`,
+      kind: 'LIVE',
+    }));
+    const agentEntries = agentLog.map((e) => ({
+      id: `agent-${e.id}`,
+      timestamp: e.timestamp,
+      stage: e.stage,
+      stageClass: 'log-stage-agent',
+      message: e.message,
+      kind: 'AGENT',
+    }));
+    return [...feedEntries, ...agentEntries].sort(
+      (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+    );
+  }, [data?.feedEvents, agentLog]);
+
   if (loading && !data) {
     return <p className="loading">Loading live monitoring…</p>;
   }
 
-  const feed = data?.feedEvents ?? [];
   const actions = data?.actionItems ?? [];
   const pending = actions.filter((a) => a.status === 'PENDING');
+  const selectedVendor = VENDORS.find((v) => v.id === vendor)?.label ?? vendor;
 
   return (
     <section className="monitoring-panel">
@@ -132,50 +209,96 @@ export default function MonitoringPanel() {
 
       {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
 
-      <div className="monitoring-simulate">
-        <span className="simulate-label">Feed live signal:</span>
-        <div className="simulate-buttons">
-          {SCENARIOS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={`simulate-btn simulate-${s.sentiment}`}
-              onClick={() => handleSimulate(s.id)}
-              disabled={feeding != null}
-              title={s.description}
-            >
-              {feeding === s.id ? 'Feeding…' : s.label}
+      {simPanelHidden ? (
+        <div className="monitoring-simulate demo-dropdown-panel demo-sim-collapsed">
+          <div className="demo-panel-header">
+            <h3 className="demo-only-heading">Demo only — simulated live signals</h3>
+            <button type="button" className="demo-panel-toggle" onClick={showSimPanel}>
+              Show
             </button>
-          ))}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="monitoring-simulate demo-dropdown-panel">
+          <div className="demo-panel-header">
+            <h3 className="demo-only-heading">Demo only — simulated live signals</h3>
+            <button
+              type="button"
+              className="demo-panel-toggle"
+              onClick={hideSimPanel}
+              aria-label="Hide simulated live signals panel"
+            >
+              Hide
+            </button>
+          </div>
+          <p className="demo-only-hint">
+            Pick a vendor and scenario to inject into the live feed. Events appear in the activity stream below with actionable insights.
+          </p>
+          <div className="demo-dropdown-row">
+            <label className="demo-field">
+              <span className="demo-field-label">Vendor / travel</span>
+              <select
+                className="demo-select"
+                value={vendor}
+                onChange={(e) => setVendor(e.target.value)}
+                disabled={feeding}
+              >
+                {VENDORS.map((v) => (
+                  <option key={v.id} value={v.id}>{v.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="demo-field demo-field-grow">
+              <span className="demo-field-label">Scenario</span>
+              <select
+                className="demo-select"
+                value={scenario}
+                onChange={(e) => setScenario(e.target.value)}
+                disabled={feeding}
+              >
+                <optgroup label="Negative signals">
+                  {scenarioGroups.NEGATIVE.map((s) => (
+                    <option key={s.id} value={s.id} title={s.description}>
+                      {s.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Positive signals">
+                  {scenarioGroups.POSITIVE.map((s) => (
+                    <option key={s.id} value={s.id} title={s.description}>
+                      {s.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Neutral">
+                  {scenarioGroups.NEUTRAL.map((s) => (
+                    <option key={s.id} value={s.id} title={s.description}>
+                      {s.label}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="primary demo-inject-btn"
+              onClick={handleSimulate}
+              disabled={feeding || !scenario}
+            >
+              {feeding ? 'Injecting…' : 'Inject demo signal'}
+            </button>
+          </div>
+          <p className="demo-preview">
+            Preview: <strong>{selectedVendor}</strong> · {scenarios.find((s) => s.id === scenario)?.description ?? scenario}
+          </p>
+        </div>
+      )}
 
       <div className="monitoring-grid">
-        <div className="panel monitoring-feed">
-          <h3>Live feed</h3>
-          {feed.length === 0 ? (
-            <p style={{ color: '#94a3b8' }}>No live events yet. Click a feed button above.</p>
-          ) : (
-            <ul className="feed-list">
-              {feed.map((e) => (
-                <li key={e.id} className={`feed-item ${sentimentClass(e.sentiment)}`}>
-                  <div className="feed-item-top">
-                    <span className={`sentiment-tag ${sentimentClass(e.sentiment)}`}>{e.sentiment}</span>
-                    <span className="feed-time">{formatTime(e.createdAt)}</span>
-                  </div>
-                  <strong>{e.title}</strong>
-                  <p>{e.detail}</p>
-                  <span className="feed-meta">{e.office} · {e.shiftId} shift</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
         <div className="panel monitoring-actions">
           <h3>Actionable insights {pending.length > 0 && <span className="action-count">({pending.length} pending)</span>}</h3>
           {actions.length === 0 ? (
-            <p style={{ color: '#94a3b8' }}>Feed a live signal to generate AI-backed action items.</p>
+            <p style={{ color: '#94a3b8' }}>Inject a demo signal to generate AI-backed action items.</p>
           ) : (
             <div className="live-action-list">
               {actions.map((a) => (
@@ -185,8 +308,17 @@ export default function MonitoringPanel() {
                       {a.status}
                     </span>
                     <span className="action-type-tag">{a.actionType}</span>
-                    {a.openaiModel && a.openaiModel !== 'template-fallback' && (
-                      <span className="ai-badge">OpenAI</span>
+                    {(data?.openAiConfigured || (a.openaiModel && a.openaiModel !== 'template-fallback')) && (
+                      <span
+                        className="ai-badge"
+                        title={
+                          a.openaiModel && a.openaiModel !== 'template-fallback'
+                            ? a.openaiModel
+                            : 'OpenAI insights enabled'
+                        }
+                      >
+                        OpenAI
+                      </span>
                     )}
                   </div>
                   <strong>{a.title}</strong>
@@ -212,6 +344,26 @@ export default function MonitoringPanel() {
                       </button>
                     </div>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="panel monitoring-feed">
+          <h3>Live activity stream</h3>
+          <p className="feed-hint">Live feed events + agent audit log, newest first</p>
+          {activityStream.length === 0 ? (
+            <p style={{ color: '#94a3b8' }}>No activity yet. Use the demo dropdown above.</p>
+          ) : (
+            <div className="activity-stream">
+              {activityStream.map((entry) => (
+                <div key={entry.id} className="log-entry activity-stream-entry">
+                  <span className="log-time">{formatTime(entry.timestamp)}</span>
+                  <span className={`log-stage ${entry.stageClass}`}>
+                    {entry.kind === 'LIVE' ? entry.stage : entry.stage}
+                  </span>
+                  <span>{entry.message}</span>
                 </div>
               ))}
             </div>

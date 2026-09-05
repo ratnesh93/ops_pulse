@@ -1,6 +1,8 @@
 package com.moveinsync.opspulse.benchmark;
 
+import com.moveinsync.opspulse.ai.AiCostService;
 import com.moveinsync.opspulse.api.dto.BriefResponse;
+import com.moveinsync.opspulse.api.dto.FacilitiesSummaryDto;
 import com.moveinsync.opspulse.api.dto.VendorSummaryDto;
 import com.moveinsync.opspulse.config.OpsPulseProperties;
 import com.moveinsync.opspulse.domain.VendorMonthlyStat;
@@ -15,6 +17,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class BenchmarkingService {
@@ -22,14 +25,23 @@ public class BenchmarkingService {
     private final OpsPulseProperties properties;
     private final TripRepository tripRepository;
     private final VendorMonthlyStatRepository vendorMonthlyStatRepository;
+    private final VendorEnrichmentService vendorEnrichmentService;
+    private final OperationalInsightsService operationalInsightsService;
+    private final AiCostService aiCostService;
 
     public BenchmarkingService(
             OpsPulseProperties properties,
             TripRepository tripRepository,
-            VendorMonthlyStatRepository vendorMonthlyStatRepository) {
+            VendorMonthlyStatRepository vendorMonthlyStatRepository,
+            VendorEnrichmentService vendorEnrichmentService,
+            OperationalInsightsService operationalInsightsService,
+            AiCostService aiCostService) {
         this.properties = properties;
         this.tripRepository = tripRepository;
         this.vendorMonthlyStatRepository = vendorMonthlyStatRepository;
+        this.vendorEnrichmentService = vendorEnrichmentService;
+        this.operationalInsightsService = operationalInsightsService;
+        this.aiCostService = aiCostService;
     }
 
     public VendorBenchmark benchmarkVendor(String vendorId) {
@@ -70,10 +82,94 @@ public class BenchmarkingService {
         return benchmarkVendor(properties.getAnalysisVendor());
     }
 
+    public List<String> listRegisteredOffices() {
+        return tripRepository.findDistinctOffices();
+    }
+
+    public Optional<OfficeSummary> summarizeOffice(String office) {
+        long total = tripRepository.countByOffice(office);
+        if (total == 0) {
+            return Optional.empty();
+        }
+
+        long onTime = tripRepository.countOnTimeByOffice(office);
+        long delayed = tripRepository.countDelayedByOffice(office);
+        long loginRoutes = tripRepository.countDistinctLoginRoutesByOffice(office);
+        long logoutRoutes = tripRepository.countDistinctLogoutRoutesByOffice(office);
+
+        OfficeSummary summary = new OfficeSummary();
+        summary.setOffice(office);
+        summary.setTripCount(total);
+        summary.setDelayedCount(delayed);
+        summary.setOtaPct(round((onTime * 100.0) / total));
+        summary.setLoginRouteCount(loginRoutes);
+        summary.setLogoutRouteCount(logoutRoutes);
+        return Optional.of(summary);
+    }
+
+    public List<String> topVendorsByDelayedTrips(int limit) {
+        return tripRepository.topVendorsByDelayedTrips().stream()
+                .limit(limit)
+                .map(row -> String.format(
+                        "%s: %,d delayed July trips",
+                        row[0],
+                        ((Number) row[1]).longValue()))
+                .toList();
+    }
+
     public List<VendorSummaryDto> listAllVendorMetrics() {
         List<VendorSummaryDto> vendors = buildVendorSummaries();
         enrichWithRanksAndPeerGap(vendors);
+        enrichWithBillAndSafety(vendors);
         return vendors;
+    }
+
+    public FacilitiesSummaryDto buildFacilitiesSummary() {
+        List<VendorSummaryDto> vendors = listAllVendorMetrics();
+        SafetyInsight safety = operationalInsightsService.analyzeSafety();
+
+        long totalTrips = vendors.stream().mapToLong(VendorSummaryDto::getTripCount).sum();
+        long totalOnTime = vendors.stream().mapToLong(VendorSummaryDto::getOnTimeTripCount).sum();
+        BigDecimal totalCost = vendorEnrichmentService.billMetricsByVendor().values().stream()
+                .map(VendorEnrichmentService.VendorBillMetric::getTotalCost)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalKm = vendorEnrichmentService.billMetricsByVendor().values().stream()
+                .map(VendorEnrichmentService.VendorBillMetric::getTotalKm)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        FacilitiesSummaryDto summary = new FacilitiesSummaryDto();
+        summary.setFleetOtaPct(totalTrips == 0 ? 0.0 : round((totalOnTime * 100.0) / totalTrips));
+        summary.setTotalCost(totalCost);
+        summary.setTotalKm(totalKm);
+        if (totalKm.compareTo(BigDecimal.ZERO) > 0) {
+            summary.setCostPerKm(totalCost.divide(totalKm, 2, RoundingMode.HALF_UP));
+        }
+        summary.setSafetyIncidentCount(safety.getJulyAlertCount());
+        summary.setSev1Count(safety.getSev1Count());
+        summary.setPanicCount(safety.getPanicCount());
+        summary.setVendorCount(vendors.size());
+        summary.setVendorsBelowSla((int) vendors.stream().filter(VendorSummaryDto::isSlaBreach).count());
+
+        vendors.stream()
+                .filter(v -> v.getCostPerKm() != null)
+                .max(Comparator.comparing(VendorSummaryDto::getCostPerKm))
+                .ifPresent(v -> {
+                    summary.setHighestCostPerKmVendor(v.getDisplayName());
+                    summary.setHighestCostPerKm(v.getCostPerKm());
+                });
+
+        vendors.stream()
+                .min(Comparator.comparing(VendorSummaryDto::getOtaPct))
+                .ifPresent(v -> {
+                    summary.setLowestOtaVendor(v.getDisplayName());
+                    summary.setLowestOtaPct(v.getOtaPct());
+                });
+
+        summary.setAiMonthlyCostInr(aiCostService.getCurrentMonthCostInr());
+        summary.setAiMonthlyRequestCount(aiCostService.getCurrentMonthRequestCount());
+        summary.setAiCostMonth(aiCostService.getCurrentMonthLabel());
+
+        return summary;
     }
 
     public BriefResponse.MorningBrief buildMorningBrief(int findingCount, int pendingActionCount) {
@@ -172,6 +268,25 @@ public class BenchmarkingService {
             vendor.setOtaRank(rankByVendor.getOrDefault(vendor.getVendorId(), total));
             if (peerOta > 0) {
                 vendor.setPeerGapPct(round(peerOta - vendor.getOtaPct()));
+            }
+        }
+    }
+
+    private void enrichWithBillAndSafety(List<VendorSummaryDto> vendors) {
+        Map<String, VendorEnrichmentService.VendorBillMetric> billMetrics = vendorEnrichmentService.billMetricsByVendor();
+        Map<String, VendorEnrichmentService.VendorSafetyMetric> safetyMetrics = vendorEnrichmentService.safetyMetricsByVendor();
+
+        for (VendorSummaryDto vendor : vendors) {
+            VendorEnrichmentService.VendorBillMetric bill = billMetrics.get(vendor.getVendorId());
+            if (bill != null && bill.getCostPerKm() != null) {
+                vendor.setCostPerKm(bill.getCostPerKm());
+            }
+
+            VendorEnrichmentService.VendorSafetyMetric safety = safetyMetrics.get(vendor.getVendorId());
+            if (safety != null) {
+                vendor.setSafetyIncidentCount(safety.getIncidentCount());
+                vendor.setSev1Count(safety.getSev1Count());
+                vendor.setPanicCount(safety.getPanicCount());
             }
         }
     }

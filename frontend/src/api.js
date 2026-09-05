@@ -30,8 +30,15 @@ export async function fetchMonitoring() {
   return res.json();
 }
 
-export async function simulateMonitoringFeed(scenario) {
-  const res = await fetch(`${API_BASE}/monitoring/simulate/${scenario}`, { method: 'POST' });
+export async function fetchMonitoringScenarios() {
+  const res = await fetch(`${API_BASE}/monitoring/scenarios`);
+  if (!res.ok) throw new Error('Failed to load monitoring scenarios');
+  return res.json();
+}
+
+export async function simulateMonitoringFeed(scenario, vendor = 'rohan') {
+  const params = new URLSearchParams({ vendor });
+  const res = await fetch(`${API_BASE}/monitoring/simulate/${scenario}?${params}`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to simulate live feed');
   return res.json();
 }
@@ -66,6 +73,12 @@ export async function fetchVendors() {
   return res.json();
 }
 
+export async function fetchFacilitiesSummary() {
+  const res = await fetch(`${API_BASE}/facilities/summary`);
+  if (!res.ok) throw new Error('Failed to load facilities summary');
+  return res.json();
+}
+
 export async function fetchChatStatus() {
   const res = await fetch(`${API_BASE}/chat/status`);
   if (!res.ok) throw new Error('Failed to load chat status');
@@ -81,6 +94,25 @@ export async function sendChatMessage(message) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || 'Chat failed');
+  }
+  return res.json();
+}
+
+export async function transcribeSpeech(audioBlob) {
+  const form = new FormData();
+  form.append('audio', audioBlob, 'recording.webm');
+  const res = await fetch(`${API_BASE}/chat/transcribe`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    try {
+      const err = JSON.parse(text);
+      throw new Error(err.message || text);
+    } catch {
+      throw new Error(text || 'Speech transcription failed');
+    }
   }
   return res.json();
 }

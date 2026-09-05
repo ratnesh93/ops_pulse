@@ -86,7 +86,8 @@ public class MoveInSyncDatasetAdapter implements SourceAdapter {
 
         Path dataDir = Path.of(properties.getDataPath());
         if (!Files.isDirectory(dataDir)) {
-            throw new IllegalStateException("DATA_PATH not found: " + dataDir);
+            log.warn("DATA_PATH not found: {} — skipping ingest. Mount CSVs or set SKIP_DATA_LOAD=true.", dataDir);
+            return;
         }
 
         log.info("Loading bill data...");

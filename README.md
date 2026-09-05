@@ -242,6 +242,54 @@ opspulse/
         └── ChatPanel.jsx
 ```
 
+## Deploy on Render.com
+
+This repo includes a [Render Blueprint](https://render.com/docs/blueprint-spec) at `render.yaml`.
+
+### One-click deploy
+
+1. Push `opspulse` to GitHub (or connect your existing repo).
+2. Open [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint**.
+3. Connect the repo and apply the blueprint. Render creates:
+   - **opspulse-db** — PostgreSQL
+   - **opspulse-api** — Spring Boot (Docker)
+   - **opspulse-web** — React static site
+
+4. When prompted, enter `SARVAM_API_KEY` (optional — skip for text-only chat).
+
+### Load the dataset (required for real metrics)
+
+The MoveInSync CSVs are not in git (~190 MB). After the API service is live:
+
+1. Open **opspulse-api** → **Shell** in the Render dashboard.
+2. Upload these files into `/data/moveinsync` (persistent disk):
+   - `Ride_data _trip-July_2026.csv`
+   - `Ride_data _trip-June_2026.csv`
+   - `bill_data.csv`
+   - `alerts_data.csv`
+
+   Use `scp`, the Render disk, or paste via shell — filenames must match exactly.
+
+3. In **opspulse-api** → **Environment**, set `SKIP_DATA_LOAD=false`.
+4. **Manual Deploy** the API service. First ingest takes ~1–2 minutes.
+
+To re-ingest from scratch, delete the `data_loaded` row in `app_metadata` (or reset the database) and redeploy.
+
+### URLs after deploy
+
+| Service | URL |
+|---|---|
+| Dashboard | `https://opspulse-web.onrender.com` (your static site URL) |
+| API | `https://opspulse-api.onrender.com` |
+
+The static site reads `VITE_API_BASE_URL` from the API service URL at build time (wired in `render.yaml`).
+
+### Notes
+
+- **Starter plan** on the API avoids free-tier spin-down during demos; the web static site can stay on **free**.
+- API health check: `/api/health`
+- If the API starts before CSVs are uploaded, the app still boots (`SKIP_DATA_LOAD=true` by default) but shows empty metrics until ingest runs.
+
 ## Further reading
 
 - Build spec: [../docs/OPS_PULSE_FINAL_PLAN.md](../docs/OPS_PULSE_FINAL_PLAN.md)

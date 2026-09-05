@@ -16,10 +16,10 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /api/health
-    disk:
-      name: opspulse-data
-      mountPath: /data/moveinsync
-      sizeGB: 2
+    #disk:
+      #name: opspulse-data
+      #mountPath: /data/moveinsync
+      #sizeGB: 2
     envVars:
       - key: PORT
         value: "8080"
@@ -64,6 +64,8 @@ services:
       - key: SKIP_DATA_LOAD
         value: "true"
       - key: SARVAM_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
         sync: false
 
   # React static site (CDN)

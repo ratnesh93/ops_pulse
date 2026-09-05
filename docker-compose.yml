@@ -25,6 +25,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/opspulse
       SPRING_DATASOURCE_USERNAME: opspulse
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-opspulse_dev_password}
+      ADMIN_INGEST_SECRET: ${ADMIN_INGEST_SECRET:-local-dev-ingest-secret}
       DATA_PATH: /data/moveinsync
       TRIP_FILE: "Ride_data _trip-July_2026.csv"
       PRIOR_TRIP_FILE: "Ride_data _trip-June_2026.csv"

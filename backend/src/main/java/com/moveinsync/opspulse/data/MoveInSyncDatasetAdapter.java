@@ -78,16 +78,34 @@ public class MoveInSyncDatasetAdapter implements SourceAdapter {
             log.info("Skipping data load (SKIP_DATA_LOAD=true)");
             return;
         }
+        loadForced(false);
+    }
 
-        if (appMetadataRepository.findById(DATA_LOADED_KEY).isPresent()) {
-            log.info("Data already loaded, skipping ingest");
-            return;
+    @Override
+    @Transactional
+    public Map<String, Object> loadForced(boolean force) {
+        Path dataDir = Path.of(properties.getDataPath());
+        Map<String, Object> fileStatus = describeDataFiles(dataDir);
+
+        if (!Files.isDirectory(dataDir)) {
+            return result(false, "DATA_PATH not found: " + dataDir, fileStatus, 0);
         }
 
-        Path dataDir = Path.of(properties.getDataPath());
-        if (!Files.isDirectory(dataDir)) {
-            log.warn("DATA_PATH not found: {} — skipping ingest. Mount CSVs or set SKIP_DATA_LOAD=true.", dataDir);
-            return;
+        java.util.List<String> missing = missingRequiredFiles(dataDir);
+        if (!missing.isEmpty()) {
+            return result(false, "Missing required CSV files: " + missing, fileStatus, tripRepository.count());
+        }
+
+        if (!force && appMetadataRepository.findById(DATA_LOADED_KEY).isPresent()) {
+            long trips = tripRepository.count();
+            log.info("Data already loaded ({} trips), skipping ingest", trips);
+            return result(true, "Already loaded — use force=true to re-ingest", fileStatus, trips);
+        }
+
+        if (force) {
+            appMetadataRepository.deleteById(DATA_LOADED_KEY);
+            jdbcTemplate.update("DELETE FROM vendor_monthly_stats WHERE month_year = ?", "2026-06");
+            log.info("Force re-ingest: cleared data_loaded flag and June vendor stats");
         }
 
         log.info("Loading bill data...");
@@ -104,7 +122,63 @@ public class MoveInSyncDatasetAdapter implements SourceAdapter {
         metadata.setValue("true");
         appMetadataRepository.save(metadata);
 
-        log.info("Data load complete. Trips: {}", tripRepository.count());
+        long tripCount = tripRepository.count();
+        log.info("Data load complete. Trips: {}", tripCount);
+        return result(true, "Ingest complete", fileStatus, tripCount);
+    }
+
+    public Map<String, Object> describeDataFiles(Path dataDir) {
+        Map<String, Object> files = new HashMap<>();
+        if (!Files.isDirectory(dataDir)) {
+            files.put("dataPath", dataDir.toString());
+            files.put("exists", false);
+            return files;
+        }
+        files.put("dataPath", dataDir.toString());
+        files.put("exists", true);
+        files.put(properties.getTripFile(), fileInfo(dataDir.resolve(properties.getTripFile())));
+        files.put(properties.getPriorTripFile(), fileInfo(dataDir.resolve(properties.getPriorTripFile())));
+        files.put(properties.getBillFile(), fileInfo(dataDir.resolve(properties.getBillFile())));
+        files.put(properties.getAlertsFile(), fileInfo(dataDir.resolve(properties.getAlertsFile())));
+        files.put("dataLoaded", appMetadataRepository.findById(DATA_LOADED_KEY).isPresent());
+        files.put("tripCount", tripRepository.count());
+        return files;
+    }
+
+    private Map<String, Object> fileInfo(Path path) {
+        Map<String, Object> info = new HashMap<>();
+        info.put("present", Files.isRegularFile(path));
+        if (Files.isRegularFile(path)) {
+            try {
+                info.put("bytes", Files.size(path));
+            } catch (Exception ignored) {
+                info.put("bytes", -1);
+            }
+        }
+        return info;
+    }
+
+    private java.util.List<String> missingRequiredFiles(Path dataDir) {
+        java.util.List<String> missing = new java.util.ArrayList<>();
+        for (String name : java.util.List.of(
+                properties.getTripFile(),
+                properties.getPriorTripFile(),
+                properties.getBillFile(),
+                properties.getAlertsFile())) {
+            if (!Files.isRegularFile(dataDir.resolve(name))) {
+                missing.add(name);
+            }
+        }
+        return missing;
+    }
+
+    private Map<String, Object> result(boolean success, String message, Map<String, Object> files, long tripCount) {
+        Map<String, Object> out = new HashMap<>();
+        out.put("success", success);
+        out.put("message", message);
+        out.put("files", files);
+        out.put("tripCount", tripCount);
+        return out;
     }
 
     private Map<Long, BigDecimal> loadBillCosts(Path billFile) {

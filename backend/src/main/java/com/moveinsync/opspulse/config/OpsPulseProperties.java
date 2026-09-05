@@ -15,6 +15,7 @@ public class OpsPulseProperties {
     private double slaOtaPct = 90.0;
     private boolean skipDataLoad = false;
     private String vendorDisplayAlias = "Rohan Travel (Vendor B)";
+    private String adminIngestSecret = "";
 
     public String getDataPath() {
         return dataPath;
@@ -94,5 +95,13 @@ public class OpsPulseProperties {
 
     public void setVendorDisplayAlias(String vendorDisplayAlias) {
         this.vendorDisplayAlias = vendorDisplayAlias;
+    }
+
+    public String getAdminIngestSecret() {
+        return adminIngestSecret;
+    }
+
+    public void setAdminIngestSecret(String adminIngestSecret) {
+        this.adminIngestSecret = adminIngestSecret;
     }
 }

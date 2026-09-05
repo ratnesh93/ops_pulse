@@ -34,4 +34,19 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
             ORDER BY trip_count DESC
             """, nativeQuery = true)
     List<Object[]> aggregateMetricsByVendor();
+
+    @Query(value = """
+            SELECT office, shift_id,
+                   SUM(occupancy) AS total_riders,
+                   SUM(capacity) AS total_seats,
+                   SUM(GREATEST(occupancy - capacity, 0)) AS overbooked_seats,
+                   COUNT(*) FILTER (WHERE occupancy > capacity AND capacity > 0) AS overbooked_trips
+            FROM trips
+            WHERE occupancy IS NOT NULL AND capacity IS NOT NULL AND capacity > 0
+            GROUP BY office, shift_id
+            HAVING SUM(GREATEST(occupancy - capacity, 0)) > 0
+            ORDER BY overbooked_seats DESC
+            LIMIT 1
+            """, nativeQuery = true)
+    List<Object[]> topOverbookedOfficeShift();
 }

@@ -3,8 +3,10 @@ package com.moveinsync.opspulse.agent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moveinsync.opspulse.benchmark.BenchmarkingService;
+import com.moveinsync.opspulse.benchmark.CapacityInsight;
+import com.moveinsync.opspulse.benchmark.OperationalInsightsService;
+import com.moveinsync.opspulse.benchmark.SafetyInsight;
 import com.moveinsync.opspulse.benchmark.VendorBenchmark;
-import com.moveinsync.opspulse.config.OpsPulseProperties;
 import com.moveinsync.opspulse.domain.AgentAction;
 import com.moveinsync.opspulse.domain.AgentAuditLog;
 import com.moveinsync.opspulse.domain.Finding;
@@ -25,9 +27,9 @@ import java.util.UUID;
 @Service
 public class AgentOrchestrator {
 
-    private final OpsPulseProperties properties;
     private final TripRepository tripRepository;
     private final BenchmarkingService benchmarkingService;
+    private final OperationalInsightsService operationalInsightsService;
     private final NarrationClient narrationClient;
     private final FindingRepository findingRepository;
     private final AgentActionRepository agentActionRepository;
@@ -37,17 +39,17 @@ public class AgentOrchestrator {
     private volatile String leadershipMemo;
 
     public AgentOrchestrator(
-            OpsPulseProperties properties,
             TripRepository tripRepository,
             BenchmarkingService benchmarkingService,
+            OperationalInsightsService operationalInsightsService,
             NarrationClient narrationClient,
             FindingRepository findingRepository,
             AgentActionRepository agentActionRepository,
             AgentAuditLogRepository auditLogRepository,
             ObjectMapper objectMapper) {
-        this.properties = properties;
         this.tripRepository = tripRepository;
         this.benchmarkingService = benchmarkingService;
+        this.operationalInsightsService = operationalInsightsService;
         this.narrationClient = narrationClient;
         this.findingRepository = findingRepository;
         this.agentActionRepository = agentActionRepository;
@@ -58,6 +60,9 @@ public class AgentOrchestrator {
     @Transactional
     public UUID runCycle() {
         UUID runId = UUID.randomUUID();
+        int findingCount = 0;
+        int actionCount = 0;
+
         long tripCount = tripRepository.count();
         audit(runId, "SENSE", String.format("Scanned %,d July trips", tripCount));
 
@@ -78,14 +83,48 @@ public class AgentOrchestrator {
         audit(runId, "REASON", "Delay attribution: " + attributionSummary);
 
         if (benchmark.isSlaBreach()) {
-            Finding finding = createOrRefreshFinding(benchmark);
+            Finding finding = upsertFinding("VENDOR_SLA_BREACH", "HIGH", benchmark, null, null);
             draftEscalation(runId, finding, benchmark);
+            findingCount++;
+            actionCount++;
+        }
+
+        SafetyInsight safety = operationalInsightsService.analyzeSafety();
+        audit(runId, "SENSE", String.format(
+                "Scanned %,d July safety alerts — %d Sev-1, %d panic",
+                safety.getJulyAlertCount(),
+                safety.getSev1Count(),
+                safety.getPanicCount()));
+
+        if (safety.requiresEscalation()) {
+            Finding safetyFinding = upsertFinding("SAFETY_ESCALATION", "HIGH", null, safety, null);
+            draftSafetyEscalation(runId, safetyFinding, safety);
+            findingCount++;
+            actionCount++;
+        }
+
+        CapacityInsight capacity = operationalInsightsService.analyzeCapacity();
+        if (capacity != null && capacity.hasOverbooking()) {
+            audit(runId, "REASON", String.format(
+                    "%s %s overbooked by %,d seats across %,d trips",
+                    capacity.getOffice(),
+                    capacity.getShiftId(),
+                    capacity.getOverbookedSeats(),
+                    capacity.getOverbookedTrips()));
+
+            Finding capacityFinding = upsertFinding("CAPACITY_SHORTFALL", "MEDIUM", null, null, capacity);
+            draftAddCapacity(runId, capacityFinding, capacity);
+            findingCount++;
+            actionCount++;
         }
 
         leadershipMemo = narrationClient.generateLeadershipMemo(benchmark);
         createMemoAction(runId);
 
-        audit(runId, "COMPLETE", "Agent cycle complete — 1 finding, escalation pending confirm");
+        audit(runId, "COMPLETE", String.format(
+                "Agent cycle complete — %d findings, %d actions pending confirm",
+                findingCount,
+                actionCount));
         return runId;
     }
 
@@ -111,41 +150,60 @@ public class AgentOrchestrator {
         return action;
     }
 
-    private Finding createOrRefreshFinding(VendorBenchmark benchmark) {
-        List<Finding> existing = findingRepository.findByStatusOrderByCreatedAtDesc("ACTIVE");
-        Finding finding = existing.isEmpty() ? new Finding() : existing.get(0);
+    private Finding upsertFinding(
+            String type,
+            String severity,
+            VendorBenchmark benchmark,
+            SafetyInsight safety,
+            CapacityInsight capacity) {
+        Finding finding = findingRepository
+                .findFirstByTypeAndStatusOrderByCreatedAtDesc(type, "ACTIVE")
+                .orElse(new Finding());
 
-        finding.setType("VENDOR_SLA_BREACH");
-        finding.setSeverity("HIGH");
-        finding.setMetricJson(toJson(Map.of(
-                "vendorId", benchmark.getVendorId(),
-                "otaPct", benchmark.getOtaPct(),
-                "tripCount", benchmark.getTripCount(),
-                "totalCost", benchmark.getTotalCost())));
-        finding.setBenchmarkJson(toJson(Map.of(
-                "slaOtaPct", benchmark.getSlaOtaPct(),
-                "priorMonthOtaPct", benchmark.getPriorMonthOtaPct(),
-                "peerOtaPct", benchmark.getPeerOtaPct(),
-                "peerVendorName", benchmark.getPeerVendorName(),
-                "delayAttribution", benchmark.getDelayAttribution())));
-        finding.setNarration(narrationClient.narrateVendorBreach(benchmark));
+        finding.setType(type);
+        finding.setSeverity(severity);
         finding.setStatus("ACTIVE");
         finding.setCreatedAt(Instant.now());
+
+        if (benchmark != null) {
+            finding.setMetricJson(toJson(Map.of(
+                    "vendorId", benchmark.getVendorId(),
+                    "otaPct", benchmark.getOtaPct(),
+                    "tripCount", benchmark.getTripCount(),
+                    "totalCost", benchmark.getTotalCost())));
+            finding.setBenchmarkJson(toJson(Map.of(
+                    "slaOtaPct", benchmark.getSlaOtaPct(),
+                    "priorMonthOtaPct", benchmark.getPriorMonthOtaPct(),
+                    "peerOtaPct", benchmark.getPeerOtaPct(),
+                    "peerVendorName", benchmark.getPeerVendorName(),
+                    "delayAttribution", benchmark.getDelayAttribution())));
+            finding.setNarration(narrationClient.narrateVendorBreach(benchmark));
+        } else if (safety != null) {
+            finding.setMetricJson(toJson(Map.of(
+                    "julyAlertCount", safety.getJulyAlertCount(),
+                    "sev1Count", safety.getSev1Count(),
+                    "panicCount", safety.getPanicCount(),
+                    "openHighSeverityCount", safety.getOpenHighSeverityCount())));
+            finding.setBenchmarkJson(toJson(Map.of("topEventTypes", safety.getTopEventTypes())));
+            finding.setNarration(narrationClient.narrateSafetyEscalation(safety));
+        } else if (capacity != null) {
+            finding.setMetricJson(toJson(Map.of(
+                    "office", capacity.getOffice(),
+                    "shiftId", capacity.getShiftId(),
+                    "overbookedSeats", capacity.getOverbookedSeats(),
+                    "overbookedTrips", capacity.getOverbookedTrips(),
+                    "totalRiders", capacity.getTotalRiders(),
+                    "totalSeats", capacity.getTotalSeats())));
+            finding.setBenchmarkJson(toJson(Map.of(
+                    "recommendedExtraVehicles", capacity.recommendedExtraVehicles())));
+            finding.setNarration(narrationClient.narrateCapacityShortfall(capacity));
+        }
+
         return findingRepository.save(finding);
     }
 
     private void draftEscalation(UUID runId, Finding finding, VendorBenchmark benchmark) {
-        List<AgentAction> pending = agentActionRepository
-                .findByActionTypeAndStatus("ESCALATE_VENDOR", "PENDING");
-
-        AgentAction action;
-        if (pending.isEmpty()) {
-            action = new AgentAction();
-            action.setCreatedAt(Instant.now());
-        } else {
-            action = pending.get(0);
-        }
-
+        AgentAction action = getOrCreatePendingAction("ESCALATE_VENDOR");
         action.setFindingId(finding.getId());
         action.setActionType("ESCALATE_VENDOR");
         action.setPayloadJson(toJson(Map.of(
@@ -159,9 +217,68 @@ public class AgentOrchestrator {
                 benchmark.getOtaPct(),
                 benchmark.getSlaOtaPct()));
         action.setStatus("PENDING");
+        if (action.getCreatedAt() == null) {
+            action.setCreatedAt(Instant.now());
+        }
         agentActionRepository.save(action);
-
         audit(runId, "ACT", "ESCALATE_VENDOR drafted, pending confirm");
+    }
+
+    private void draftSafetyEscalation(UUID runId, Finding finding, SafetyInsight safety) {
+        AgentAction action = getOrCreatePendingAction("ESCALATE_SAFETY");
+        action.setFindingId(finding.getId());
+        action.setActionType("ESCALATE_SAFETY");
+        action.setPayloadJson(toJson(Map.of(
+                "sev1Count", safety.getSev1Count(),
+                "panicCount", safety.getPanicCount(),
+                "julyAlertCount", safety.getJulyAlertCount(),
+                "topEventTypes", safety.getTopEventTypes())));
+        action.setDraftedMessage(String.format(
+                "Draft safety escalation: %d Sev-1 alerts (%d panic) in July. Route to transport safety desk for 24h review.",
+                safety.getSev1Count(),
+                safety.getPanicCount()));
+        action.setStatus("PENDING");
+        if (action.getCreatedAt() == null) {
+            action.setCreatedAt(Instant.now());
+        }
+        agentActionRepository.save(action);
+        audit(runId, "ACT", "ESCALATE_SAFETY drafted, pending confirm");
+    }
+
+    private void draftAddCapacity(UUID runId, Finding finding, CapacityInsight capacity) {
+        int extra = capacity.recommendedExtraVehicles();
+        AgentAction action = getOrCreatePendingAction("ADD_CAPACITY");
+        action.setFindingId(finding.getId());
+        action.setActionType("ADD_CAPACITY");
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("office", capacity.getOffice());
+        payload.put("shiftId", capacity.getShiftId());
+        payload.put("overbookedSeats", capacity.getOverbookedSeats());
+        payload.put("extraVehicles", extra);
+        action.setPayloadJson(toJson(payload));
+        action.setDraftedMessage(String.format(
+                "ADD_CAPACITY: Deploy +%d backup vehicles for %s %s shift (%d-seat gap, %d trips). Draft vendor extra-trip request.",
+                extra,
+                capacity.getOffice(),
+                capacity.getShiftId(),
+                capacity.getOverbookedSeats(),
+                capacity.getOverbookedTrips()));
+        action.setStatus("PENDING");
+        if (action.getCreatedAt() == null) {
+            action.setCreatedAt(Instant.now());
+        }
+        agentActionRepository.save(action);
+        audit(runId, "ACT", "ADD_CAPACITY drafted, pending confirm");
+    }
+
+    private AgentAction getOrCreatePendingAction(String actionType) {
+        List<AgentAction> pending = agentActionRepository.findByActionTypeAndStatus(actionType, "PENDING");
+        if (pending.isEmpty()) {
+            AgentAction action = new AgentAction();
+            action.setCreatedAt(Instant.now());
+            return action;
+        }
+        return pending.get(0);
     }
 
     private void createMemoAction(UUID runId) {

@@ -9,6 +9,7 @@ public class OpsPulseProperties {
     private String tripFile = "Ride_data _trip-July_2026.csv";
     private String priorTripFile = "Ride_data _trip-June_2026.csv";
     private String billFile = "bill_data.csv";
+    private String alertsFile = "alerts_data.csv";
     private String analysisVendor = "Rohan Mikhailov Travel";
     private String peerVendor = "Priya Mikhailov Travel";
     private double slaOtaPct = 90.0;
@@ -45,6 +46,14 @@ public class OpsPulseProperties {
 
     public void setBillFile(String billFile) {
         this.billFile = billFile;
+    }
+
+    public String getAlertsFile() {
+        return alertsFile;
+    }
+
+    public void setAlertsFile(String alertsFile) {
+        this.alertsFile = alertsFile;
     }
 
     public String getAnalysisVendor() {

@@ -1,91 +1,248 @@
 # Ops Pulse
 
-Agentic intelligence layer for enterprise employee mobility — demo build for MoveInSync hackathon.
+Agentic intelligence layer for enterprise employee mobility — MoveInSync hackathon demo.
+
+Ops Pulse ingests real MoveInSync trip data, benchmarks vendor SLA performance, and runs an agent loop that surfaces findings and draft actions for human confirmation.
+
+## Features
+
+- **Morning brief** — pre-shift summary with attention count, vendors below SLA, OTA rank, cost at risk
+- **Vendor scorecard** — 23 vendors with OTA rank, gap vs peer, cost per on-time trip
+- **Agent loop** — SENSE → REASON → ACT with audit trail
+- **3 findings + 3 confirmable actions:**
+  - `VENDOR_SLA_BREACH` → `ESCALATE_VENDOR` (Rohan Travel ~64% OTA vs 90% SLA)
+  - `SAFETY_ESCALATION` → `ESCALATE_SAFETY` (July Sev-1 alerts from `alerts_data.csv`)
+  - `CAPACITY_SHORTFALL` → `ADD_CAPACITY` (overbooked office/shift from trip occupancy)
+- **Leadership memo** — Facilities Head view with copy-to-clipboard
+- **Chat** — text + optional voice input (Sarvam STT)
 
 ## Stack
 
-- **Backend:** Java 17, Spring Boot 3, PostgreSQL 16
-- **Frontend:** React (Vite)
-- **Infra:** Docker Compose
+| Layer | Tech |
+|---|---|
+| Backend | Java 17, Spring Boot 3, PostgreSQL 16, Flyway |
+| Frontend | React 18, Vite |
+| Infra | Docker Compose |
 
-## Quick Start
+## Prerequisites
+
+- **Docker** and **Docker Compose** (v2)
+- **MoveInSync dataset** — CSV files on disk (not committed to this repo)
+- *(Optional)* Sarvam API key for voice chat — [indus.sarvam.ai](https://indus.sarvam.ai/)
+
+## Setup (first time)
+
+### 1. Clone and place the dataset
+
+The compose file expects the anonymised dataset at a path **relative to `opspulse/`**:
+
+```
+moveinsync_hackthon/
+├── data/
+│   └── MoveInSync - Anonymised Trip-Log Dataset-.../
+│       └── MoveInSync - Anonymised Trip-Log Dataset/
+│           ├── Ride_data _trip-July_2026.csv
+│           ├── Ride_data _trip-June_2026.csv
+│           ├── bill_data.csv
+│           ├── alerts_data.csv
+│           └── ...
+└── opspulse/          ← you run commands from here
+    └── docker-compose.yml
+```
+
+If your dataset lives elsewhere, edit the volume mount in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - /absolute/path/to/dataset:/data/moveinsync:ro
+```
+
+### 2. Configure environment (optional)
+
+Voice chat needs a Sarvam key. Text chat works without it.
 
 ```bash
 cd opspulse
-docker compose up --build
+cp .env.example .env
+# Edit .env and set SARVAM_API_KEY=your-key-here
 ```
 
-First boot loads ~216K July trips + bill data (~30 seconds on SSD). Subsequent boots skip ingest.
-
-- **Dashboard:** http://localhost:4210
-- **API:** http://localhost:8090/api/brief
-- **Health:** http://localhost:8090/api/health
-
-> Ports 4200/8080 are used if available; current compose maps **4210** (UI) and **8090** (API).
-
-## Troubleshooting Docker build (registry / IPv6)
-
-If `docker compose build` fails with `network is unreachable` on `registry-1.docker.io` (IPv6):
+### 3. Start the stack
 
 ```bash
-# Option 1: use cached layers only (works if you built successfully before)
-docker compose build --pull=false backend
-
-# Option 2: hot-swap JAR into running container (no image rebuild)
-./scripts/rebuild-backend.sh   # requires Maven in .tools/ (see script)
-
-# Option 3: prefer IPv4 for Docker (system-wide, needs sudo)
-# Add to /etc/docker/daemon.json: { "ip6tables": false }
-# Or /etc/gai.conf: precedence ::ffff:0:0/96  100
+cd opspulse
+docker compose up --build -d
 ```
 
-If containers are already running (`docker compose ps`), you can demo without rebuilding.
+**First boot** loads ~216K July trips + bill costs + June vendor stats. Expect **30–90 seconds** before the API is ready. Subsequent boots skip ingest (stored in Postgres volume).
 
-## Demo Flow (90 seconds)
+### 4. Verify
 
-1. Open http://localhost:4210 — brief shows Rohan Travel OTA breach (~64% vs 90% SLA)
-2. Transport Manager view — review finding + pending `ESCALATE_VENDOR`
-3. Click **Confirm** — action confirmed, audit log updates
-4. Switch to **Facilities Head** — copy leadership memo
-5. Click **Run Agent Now** — activity log replays SENSE → REASON → ACT
+```bash
+curl http://localhost:8090/api/health
+# {"status":"UP"}
 
-## Plan
+curl http://localhost:8090/api/brief | head
+```
 
-See [../docs/OPS_PULSE_FINAL_PLAN.md](../docs/OPS_PULSE_FINAL_PLAN.md) for full build spec (Direction A).
+Open the dashboard: **http://localhost:4210**
 
-## Env Vars
+Hard-refresh after frontend updates: `Ctrl+Shift+R` (or `Cmd+Shift+R` on Mac).
+
+## URLs
+
+| Service | URL |
+|---|---|
+| Dashboard | http://localhost:4210 |
+| API (direct) | http://localhost:8090 |
+| Brief | http://localhost:8090/api/brief |
+| Health | http://localhost:8090/api/health |
+
+Ports **4210** (UI) and **8090** (API) avoid conflicts with common 4200/8080 defaults.
+
+## Demo flow (~2 minutes)
+
+1. Open http://localhost:4210 — morning brief + KPI bar (Rohan Travel OTA breach)
+2. **Transport Manager** — review 3 findings and 3 pending actions
+3. Click **Confirm** on `ESCALATE_VENDOR`, `ESCALATE_SAFETY`, and `ADD_CAPACITY`
+4. Watch the **Agent Activity Log** update (`ACT → CONFIRMED`)
+5. **Facilities Head** — read and copy the leadership memo
+6. **Vendors** — sort by rank, peer gap, cost/on-time
+7. **Chat** — ask about OTA, vendors, or use the mic (if Sarvam key is set)
+8. Click **Run Agent Now** to replay the agent cycle
+
+## API endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/health` | Health check |
+| GET | `/api/brief` | KPIs, morning brief, findings, pending actions |
+| GET | `/api/vendors` | All vendor scorecard rows |
+| POST | `/api/agent/run` | Trigger agent cycle |
+| POST | `/api/actions/{id}/confirm` | Confirm a pending action |
+| GET | `/api/activity-log` | Agent audit trail |
+| GET | `/api/leadership/memo` | Leadership memo text |
+| POST | `/api/chat` | Text chat |
+| POST | `/api/chat/speech` | Voice → STT → chat (needs `SARVAM_API_KEY`) |
+
+## Development
+
+### Rebuild backend after Java changes
+
+```bash
+./scripts/rebuild-backend.sh
+```
+
+This builds the JAR inside a Maven Docker container and hot-swaps it into the running backend — no Docker Hub pull required.
+
+### Rebuild frontend after React changes
+
+```bash
+docker compose build frontend && docker compose up -d frontend
+```
+
+### Full rebuild (recreates containers)
+
+```bash
+docker compose up --build -d
+```
+
+> **Note:** `docker compose up -d` recreates containers from images and **wipes hot-swapped JARs**. After a full compose up, run `./scripts/rebuild-backend.sh` again if you were using hot-swap.
+
+### Run backend tests locally
+
+```bash
+cd backend
+docker run --rm -v "$PWD:/app" -w /app maven:3.9-eclipse-temurin-17 mvn test
+```
+
+### Reset database (re-ingest from scratch)
+
+```bash
+docker compose down -v    # removes pgdata volume
+docker compose up -d      # triggers fresh ingest
+```
+
+## Environment variables
+
+Set in `docker-compose.yml` or `.env`:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATA_PATH` | `/data/moveinsync` | CSV folder mount |
-| `ANALYSIS_VENDOR` | Rohan Mikhailov Travel | Focus vendor |
-| `PEER_VENDOR` | Priya Mikhailov Travel | Peer benchmark |
-| `SLA_OTA_PCT` | 90 | SLA target |
-| `SKIP_DATA_LOAD` | false | Skip ingest on restart |
-| `SARVAM_API_KEY` | *(empty)* | Sarvam speech-to-text — get key at [indus.sarvam.ai](https://indus.sarvam.ai/) |
+| `DATA_PATH` | `/data/moveinsync` | CSV folder inside container |
+| `TRIP_FILE` | `Ride_data _trip-July_2026.csv` | July trips |
+| `PRIOR_TRIP_FILE` | `Ride_data _trip-June_2026.csv` | Prior month for trends |
+| `BILL_FILE` | `bill_data.csv` | Trip costs |
+| `ANALYSIS_VENDOR` | `Rohan Mikhailov Travel` | Focus vendor |
+| `PEER_VENDOR` | `Priya Mikhailov Travel` | Peer benchmark |
+| `SLA_OTA_PCT` | `90` | SLA target (%) |
+| `SKIP_DATA_LOAD` | `false` | Skip CSV ingest on startup |
+| `SARVAM_API_KEY` | *(empty)* | Sarvam speech-to-text for voice chat |
 
-### Sarvam speech input (chat)
+## Troubleshooting
 
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Add your API key:
-   ```
-   SARVAM_API_KEY=your-key-here
-   ```
-3. Restart backend:
-   ```bash
-   docker compose up -d backend
-   ```
-4. Open **Chat** tab in the UI — use text or 🎤 mic button.
+### Docker build fails (registry / IPv6)
 
-## Project Layout
+```bash
+# Use cached images only
+docker compose build --pull=false
+
+# Or hot-swap backend without rebuilding the image
+./scripts/rebuild-backend.sh
+```
+
+### API returns 502 / connection refused
+
+Backend may still be ingesting data on first boot. Wait 60–90s and check logs:
+
+```bash
+docker compose logs -f backend
+```
+
+Look for `Ops Pulse ready`.
+
+### UI shows stale content after deploy
+
+Hard-refresh the browser (`Ctrl+Shift+R`). The nginx config disables caching for `index.html`.
+
+### Voice chat not working
+
+1. Confirm `SARVAM_API_KEY` is set in `.env`
+2. Restart backend: `docker compose up -d backend`
+3. Check `/api/chat/status` for STT availability
+
+### Dataset not found
+
+```
+DATA_PATH not found: /data/moveinsync
+```
+
+Fix the volume mount in `docker-compose.yml` so it points to your local CSV folder.
+
+## Project layout
 
 ```
 opspulse/
 ├── docker-compose.yml
-├── backend/          # Spring Boot API + agent
-├── frontend/         # React dashboard
-└── README.md
+├── .env.example
+├── scripts/
+│   └── rebuild-backend.sh
+├── backend/
+│   └── src/main/java/com/moveinsync/opspulse/
+│       ├── agent/          # AgentOrchestrator
+│       ├── benchmark/      # SLA metrics, morning brief, insights
+│       ├── api/            # REST controllers
+│       ├── data/           # CSV ingest
+│       └── narration/      # Finding / memo templates
+└── frontend/
+    └── src/
+        ├── App.jsx
+        ├── MorningBriefBanner.jsx
+        ├── VendorPanel.jsx
+        └── ChatPanel.jsx
 ```
+
+## Further reading
+
+- Build spec: [../docs/OPS_PULSE_FINAL_PLAN.md](../docs/OPS_PULSE_FINAL_PLAN.md)
+- Dataset dictionary: [../data/.../Dictionary/README.md](../data/MoveInSync%20-%20Anonymised%20Trip-Log%20Dataset-20260905T010918Z-1-001/MoveInSync%20-%20Anonymised%20Trip-Log%20Dataset/Dictionary/README.md)

@@ -1,5 +1,7 @@
 package com.moveinsync.opspulse.narration;
 
+import com.moveinsync.opspulse.benchmark.CapacityInsight;
+import com.moveinsync.opspulse.benchmark.SafetyInsight;
 import com.moveinsync.opspulse.benchmark.VendorBenchmark;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +34,39 @@ public class TemplateNarrationClient implements NarrationClient {
                 benchmark.getPeerVendorName(),
                 peer,
                 attribution);
+    }
+
+    @Override
+    public String narrateSafetyEscalation(SafetyInsight insight) {
+        String topEvents = insight.getTopEventTypes().entrySet().stream()
+                .map(e -> e.getKey().replace('_', ' ') + " (" + e.getValue() + ")")
+                .collect(Collectors.joining(", "));
+        if (topEvents.isBlank()) {
+            topEvents = "panic and over-speeding events";
+        }
+
+        return String.format(
+                "July safety scan flagged %d Sev-1 alerts (%d panic presses) across %,d trip events. "
+                        + "Top Sev-1 drivers: %s. Recommend immediate safety desk review and vendor compliance check.",
+                insight.getSev1Count(),
+                insight.getPanicCount(),
+                insight.getJulyAlertCount(),
+                topEvents);
+    }
+
+    @Override
+    public String narrateCapacityShortfall(CapacityInsight insight) {
+        int extra = insight.recommendedExtraVehicles();
+        return String.format(
+                "%s %s shift is over capacity: %,d rider-seat gap across %,d trips in July "
+                        + "(%,d riders vs %,d seats). Recommend ADD_CAPACITY — deploy +%d backup vehicles and draft vendor extra-trip request.",
+                insight.getOffice(),
+                insight.getShiftId(),
+                insight.getOverbookedSeats(),
+                insight.getOverbookedTrips(),
+                insight.getTotalRiders(),
+                insight.getTotalSeats(),
+                extra);
     }
 
     @Override

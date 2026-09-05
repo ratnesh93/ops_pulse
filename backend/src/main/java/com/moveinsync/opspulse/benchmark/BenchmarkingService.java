@@ -1,5 +1,6 @@
 package com.moveinsync.opspulse.benchmark;
 
+import com.moveinsync.opspulse.api.dto.BriefResponse;
 import com.moveinsync.opspulse.api.dto.VendorSummaryDto;
 import com.moveinsync.opspulse.config.OpsPulseProperties;
 import com.moveinsync.opspulse.domain.VendorMonthlyStat;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +71,45 @@ public class BenchmarkingService {
     }
 
     public List<VendorSummaryDto> listAllVendorMetrics() {
+        List<VendorSummaryDto> vendors = buildVendorSummaries();
+        enrichWithRanksAndPeerGap(vendors);
+        return vendors;
+    }
+
+    public BriefResponse.MorningBrief buildMorningBrief(int findingCount, int pendingActionCount) {
+        VendorBenchmark focus = benchmarkFocusVendor();
+        List<VendorSummaryDto> vendors = listAllVendorMetrics();
+        long breachCount = vendors.stream().filter(VendorSummaryDto::isSlaBreach).count();
+        VendorSummaryDto focusRow = vendors.stream()
+                .filter(VendorSummaryDto::isFocusVendor)
+                .findFirst()
+                .orElse(null);
+
+        BriefResponse.MorningBrief brief = new BriefResponse.MorningBrief();
+        brief.setGreeting("Good morning — your July transport brief is ready");
+        brief.setItemsNeedingAttention(findingCount + pendingActionCount);
+        brief.setVendorsBelowSla((int) breachCount);
+        brief.setVendorCount(vendors.size());
+        brief.setFocusVendorName(focus.getVendorDisplayName());
+        brief.setCostAtRisk(focus.getTotalCost());
+        brief.setPeerVendorName(focus.getPeerVendorName());
+        if (focusRow != null) {
+            brief.setFocusVendorOtaRank(focusRow.getOtaRank());
+            brief.setPeerGapPct(focusRow.getPeerGapPct());
+        }
+        brief.setSummary(String.format(
+                "%d items need your attention · %d of %d vendors below SLA · %s ranks #%d on OTA (%.0f pts behind %s)",
+                brief.getItemsNeedingAttention(),
+                brief.getVendorsBelowSla(),
+                brief.getVendorCount(),
+                focus.getVendorDisplayName(),
+                brief.getFocusVendorOtaRank(),
+                brief.getPeerGapPct() != null ? brief.getPeerGapPct() : 0,
+                focus.getPeerVendorName()));
+        return brief;
+    }
+
+    private List<VendorSummaryDto> buildVendorSummaries() {
         double sla = properties.getSlaOtaPct();
         String focusId = properties.getAnalysisVendor();
         String focusAlias = properties.getVendorDisplayAlias();
@@ -89,9 +131,14 @@ public class BenchmarkingService {
                     dto.setOtaPct(ota);
                     dto.setSlaOtaPct(sla);
                     dto.setTripCount(tripCount);
+                    dto.setOnTimeTripCount(onTimeCount);
                     dto.setTotalCost(totalCost);
                     dto.setSlaBreach(ota < sla);
                     dto.setFocusVendor(vendorId.equals(focusId));
+                    if (onTimeCount > 0) {
+                        dto.setCostPerOnTimeTrip(
+                                totalCost.divide(BigDecimal.valueOf(onTimeCount), 2, RoundingMode.HALF_UP));
+                    }
 
                     vendorMonthlyStatRepository.findByVendorIdAndMonthYear(vendorId, "2026-06")
                             .map(VendorMonthlyStat::getOtaPct)
@@ -101,6 +148,32 @@ public class BenchmarkingService {
                     return dto;
                 })
                 .toList();
+    }
+
+    private void enrichWithRanksAndPeerGap(List<VendorSummaryDto> vendors) {
+        double peerOta = vendors.stream()
+                .filter(v -> v.getVendorId().equals(properties.getPeerVendor()))
+                .map(VendorSummaryDto::getOtaPct)
+                .findFirst()
+                .orElse(0.0);
+
+        List<VendorSummaryDto> byOta = vendors.stream()
+                .sorted(Comparator.comparing(VendorSummaryDto::getOtaPct).reversed())
+                .toList();
+
+        Map<String, Integer> rankByVendor = new HashMap<>();
+        for (int i = 0; i < byOta.size(); i++) {
+            rankByVendor.put(byOta.get(i).getVendorId(), i + 1);
+        }
+
+        int total = vendors.size();
+        for (VendorSummaryDto vendor : vendors) {
+            vendor.setVendorCount(total);
+            vendor.setOtaRank(rankByVendor.getOrDefault(vendor.getVendorId(), total));
+            if (peerOta > 0) {
+                vendor.setPeerGapPct(round(peerOta - vendor.getOtaPct()));
+            }
+        }
     }
 
     private VendorBenchmark benchmarkVendorRaw(String vendorId) {

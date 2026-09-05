@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import ChatPanel from './ChatPanel';
+import MorningBriefBanner from './MorningBriefBanner';
 import VendorPanel from './VendorPanel';
 import {
   confirmAction,
@@ -150,6 +151,8 @@ export default function App() {
       </header>
 
       {error && <div className="error" style={{ marginBottom: '1rem' }}>{error}</div>}
+
+      <MorningBriefBanner morningBrief={brief?.morningBrief} />
 
       <section className="kpi-bar">
         <div className="kpi">

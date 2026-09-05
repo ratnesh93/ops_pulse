@@ -65,6 +65,10 @@ public class BriefController {
                 .map(this::toActionDto)
                 .collect(Collectors.toList()));
 
+        response.setMorningBrief(benchmarkingService.buildMorningBrief(
+                response.getFindings().size(),
+                response.getPendingActions().size()));
+
         return response;
     }
 

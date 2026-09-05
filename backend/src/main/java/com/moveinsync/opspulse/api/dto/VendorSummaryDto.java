@@ -13,6 +13,11 @@ public class VendorSummaryDto {
     private long tripCount;
     private boolean slaBreach;
     private boolean focusVendor;
+    private int otaRank;
+    private int vendorCount;
+    private Double peerGapPct;
+    private BigDecimal costPerOnTimeTrip;
+    private long onTimeTripCount;
 
     public String getVendorId() {
         return vendorId;
@@ -84,5 +89,45 @@ public class VendorSummaryDto {
 
     public void setFocusVendor(boolean focusVendor) {
         this.focusVendor = focusVendor;
+    }
+
+    public int getOtaRank() {
+        return otaRank;
+    }
+
+    public void setOtaRank(int otaRank) {
+        this.otaRank = otaRank;
+    }
+
+    public int getVendorCount() {
+        return vendorCount;
+    }
+
+    public void setVendorCount(int vendorCount) {
+        this.vendorCount = vendorCount;
+    }
+
+    public Double getPeerGapPct() {
+        return peerGapPct;
+    }
+
+    public void setPeerGapPct(Double peerGapPct) {
+        this.peerGapPct = peerGapPct;
+    }
+
+    public BigDecimal getCostPerOnTimeTrip() {
+        return costPerOnTimeTrip;
+    }
+
+    public void setCostPerOnTimeTrip(BigDecimal costPerOnTimeTrip) {
+        this.costPerOnTimeTrip = costPerOnTimeTrip;
+    }
+
+    public long getOnTimeTripCount() {
+        return onTimeTripCount;
+    }
+
+    public void setOnTimeTripCount(long onTimeTripCount) {
+        this.onTimeTripCount = onTimeTripCount;
     }
 }

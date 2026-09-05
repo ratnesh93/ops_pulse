@@ -8,6 +8,13 @@ function formatCost(value) {
   return `₹${num.toLocaleString()}`;
 }
 
+function formatCostShort(value) {
+  if (!value) return '—';
+  const num = Number(value);
+  if (num >= 1000) return `₹${Math.round(num).toLocaleString()}`;
+  return `₹${num.toFixed(0)}`;
+}
+
 export default function VendorPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,27 +67,33 @@ export default function VendorPanel() {
         <table className="vendor-table">
           <thead>
             <tr>
+              <th onClick={() => toggleSort('otaRank')}>Rank{sortIcon('otaRank')}</th>
               <th onClick={() => toggleSort('displayName')}>Vendor{sortIcon('displayName')}</th>
               <th onClick={() => toggleSort('otaPct')}>OTA %{sortIcon('otaPct')}</th>
-              <th onClick={() => toggleSort('slaOtaPct')}>SLA %{sortIcon('slaOtaPct')}</th>
+              <th onClick={() => toggleSort('peerGapPct')}>Gap vs peer{sortIcon('peerGapPct')}</th>
               <th onClick={() => toggleSort('priorMonthOtaPct')}>Prior Mo %{sortIcon('priorMonthOtaPct')}</th>
               <th onClick={() => toggleSort('tripCount')}>Trips{sortIcon('tripCount')}</th>
               <th onClick={() => toggleSort('totalCost')}>Cost{sortIcon('totalCost')}</th>
+              <th onClick={() => toggleSort('costPerOnTimeTrip')}>Cost/on-time{sortIcon('costPerOnTimeTrip')}</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {vendors.map((v) => (
               <tr key={v.vendorId} className={v.focusVendor ? 'focus-row' : ''}>
+                <td className="rank-cell">#{v.otaRank}</td>
                 <td>
                   {v.displayName}
                   {v.focusVendor && <span className="focus-tag">Focus</span>}
                 </td>
                 <td className={v.slaBreach ? 'ota-bad' : 'ota-good'}>{v.otaPct.toFixed(1)}%</td>
-                <td>{v.slaOtaPct}%</td>
+                <td className={v.peerGapPct > 0 ? 'gap-bad' : 'ota-good'}>
+                  {v.peerGapPct != null ? `+${v.peerGapPct.toFixed(1)} pts` : '—'}
+                </td>
                 <td>{v.priorMonthOtaPct != null ? `${v.priorMonthOtaPct.toFixed(1)}%` : '—'}</td>
                 <td>{v.tripCount.toLocaleString()}</td>
                 <td>{formatCost(v.totalCost)}</td>
+                <td>{formatCostShort(v.costPerOnTimeTrip)}</td>
                 <td>
                   <span className={`status-badge ${v.slaBreach ? 'pending' : 'confirmed'}`}>
                     {v.slaBreach ? 'BREACH' : 'OK'}
